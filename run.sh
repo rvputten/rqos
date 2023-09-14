@@ -11,10 +11,10 @@ pid=`ps -eo pid,comm|grep -w "$exe_name"|awk '{print $1}'`
 cargo fmt
 cargo clippy 2>&1 | head -40 | tee error.txt
 if [[ "$?" -eq 0 ]]; then
-    source .env
+    [[ -f .env ]] && source .env
     cargo test && {
 	echo --------------------------------------------------------------------------------
-	unbuffer cargo run &
+	unbuffer cargo build &
     }
 else
     clear
