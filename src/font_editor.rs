@@ -28,7 +28,7 @@ impl Editor {
         window: RenderWindow,
     ) {
         let grid_offset = Vector2i::new(font_size.x, font_size.y) * scale;
-        let font = if let Some(font) = Font::load(font_name, font_size) {
+        let font = if let Ok(font) = Font::load(font_name, font_size) {
             font
         } else {
             Font::new(font_name, font_size)

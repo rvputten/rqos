@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::Write;
 
 use sfml::system::Vector2i;
@@ -5,6 +6,24 @@ use sfml::system::Vector2i;
 #[derive(Clone)]
 pub struct Char {
     pub pixels: Vec<Vec<u8>>,
+}
+
+impl fmt::Display for Char {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for row in &self.pixels {
+            for pixel in row {
+                let pixel_repr = match *pixel {
+                    0..=63 => ' ',
+                    64..=127 => '·',
+                    128..=191 => '+',
+                    192..=255 => '*',
+                };
+                write!(f, "{}", pixel_repr)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
 }
 
 impl Char {
@@ -43,22 +62,27 @@ impl Char {
     }
 
     pub fn save(&self, file: &mut std::fs::File) -> std::io::Result<()> {
-        let mut line = String::new();
-        for row in &self.pixels {
-            eprintln!("row: {:?}", row);
-            for pixel in row {
-                let pixel_repr = match *pixel {
-                    0..=63 => ' ',
-                    64..=127 => '·',
-                    128..=191 => '+',
-                    192..=255 => '*',
-                };
-                line.push(pixel_repr);
-            }
-            line.push('\n');
-        }
-        file.write_all(line.as_bytes())?;
-
+        let s = format!("{}", self);
+        file.write_all(s.as_bytes())?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_char_display() {
+        let x = r#" +++
++   +
++   +
++++++
++   +
++   +
++   +
+"#;
+        let ch = Char::from_ascii(x);
+        assert_eq!(format!("{}", ch), x);
     }
 }
