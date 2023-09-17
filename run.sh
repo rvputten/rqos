@@ -14,6 +14,7 @@ if [[ "$?" -eq 0 ]]; then
     [[ -f .env ]] && source .env
     cargo test && {
 	echo --------------------------------------------------------------------------------
+	rg --color=always '#\[allow\(dead_code\)\]'
 	unbuffer cargo build &
     }
 else

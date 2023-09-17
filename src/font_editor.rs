@@ -5,6 +5,7 @@ use sfml::window::Event;
 use crate::char::Char;
 use crate::font::Font;
 
+#[allow(dead_code)]
 pub struct Editor {
     font_name: String,
     font_size: Vector2i,
@@ -30,7 +31,7 @@ impl Editor {
         let font = if let Some(font) = Font::load(font_name, font_size) {
             font
         } else {
-            Font::new(&font_name, font_size)
+            Font::new(font_name, font_size)
         };
 
         let display_char = 'A' as usize;
@@ -95,8 +96,8 @@ impl Editor {
                         y,
                     } => {
                         self.current_char.set_pixel(
-                            ((x as i32 - self.grid_offset.x) / self.grid_size.x) as usize,
-                            ((y as i32 - self.grid_offset.y) / self.grid_size.y) as usize,
+                            ((x - self.grid_offset.x) / self.grid_size.x) as usize,
+                            ((y - self.grid_offset.y) / self.grid_size.y) as usize,
                             self.current_color,
                         );
                     }
