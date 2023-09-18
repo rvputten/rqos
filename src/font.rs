@@ -26,30 +26,12 @@ impl Font {
         format!("resources/{}_{}x{}.bin", name, char_size.x, char_size.y)
     }
 
-    #[allow(dead_code)]
-    #[allow(unused_variables)]
     pub fn load(name: &str, char_size: Vector2i) -> std::io::Result<Font> {
         let mut font = Self::new(name, char_size);
         let filename = Self::filename(name, char_size);
         let file = std::fs::File::open(filename)?;
         let mut buf_reader = std::io::BufReader::new(file);
 
-        let mut read_str = || {
-            let mut s = String::new();
-            let num_read = buf_reader.read_line(&mut s)?;
-            if num_read == 0 {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::UnexpectedEof,
-                    "Unexpected EOF",
-                ));
-            }
-            Ok(s.trim().to_string())
-        };
-
-        let name = read_str()?.strip_prefix("Name: ").unwrap();
-        let size = read_str()?.strip_prefix("Size: ").unwrap().to_string();
-        let size: Vec<_> = size.split('x').collect();
-        let size = Vector2i::new(size[0].parse().unwrap(), size[1].parse().unwrap());
         let mut current_char = None;
         let mut current_char_lines = String::new();
 
@@ -96,7 +78,6 @@ impl Font {
         Ok(font)
     }
 
-    #[allow(dead_code)]
     pub fn save(&self) -> std::io::Result<()> {
         let filename = Self::filename(&self.name, self.char_size);
         let mut file = std::fs::File::create(filename)?;
@@ -135,14 +116,12 @@ impl Font {
         self.chars[index].clone()
     }
 
-    #[allow(dead_code)]
     pub fn set_char(&mut self, index: usize, ch: Char) {
         self.extend_chars(index);
         self.chars[index] = ch;
     }
 
     // make sure we can access chars[index]
-    #[allow(dead_code)]
     pub fn extend_chars(&mut self, index: usize) {
         let len = self.chars.len();
         for _ in len..index + 1 {

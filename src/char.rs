@@ -13,10 +13,9 @@ impl fmt::Display for Char {
         for row in &self.pixels {
             for pixel in row {
                 let pixel_repr = match *pixel {
-                    0..=63 => ' ',
-                    64..=127 => '·',
-                    128..=191 => '+',
-                    192..=255 => '*',
+                    0..=84 => ' ',
+                    85..=169 => '+',
+                    170..=255 => '#',
                 };
                 write!(f, "{}", pixel_repr)?;
             }
@@ -44,9 +43,8 @@ impl Char {
             for c in line.chars() {
                 row.push(match c {
                     ' ' => 0,
-                    '·' => 85,
-                    '+' => 170,
-                    '*' => 255,
+                    '+' => 127,
+                    '#' => 255,
                     _ => 0,
                 });
             }
@@ -74,13 +72,13 @@ mod tests {
 
     #[test]
     fn test_char_display() {
-        let x = r#" +++
-+   +
-+   +
-+++++
-+   +
-+   +
-+   +
+        let x = r#" ###
+#   #
+#   #
+#####
+#   #
+#   #
+#   #
 "#;
         let ch = Char::from_ascii(x);
         assert_eq!(format!("{}", ch), x);

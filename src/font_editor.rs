@@ -6,13 +6,10 @@ use sfml::window::Event;
 use crate::char::Char;
 use crate::font::Font;
 
-#[allow(dead_code)]
 pub struct Editor {
-    font_name: String,
     font_size: Vector2i,
     grid_size: Vector2i,
     grid_offset: Vector2i,
-    scale: i32,
     window: RenderWindow,
     display_char: usize,
     font: Font,
@@ -37,11 +34,9 @@ impl Editor {
         let display_char = 'A' as usize;
         let current_char = font.get_char(display_char);
         let mut editor = Self {
-            font_name: font_name.to_string(),
             font_size,
             grid_size,
             grid_offset,
-            scale,
             window,
             display_char,
             font,
@@ -50,12 +45,10 @@ impl Editor {
 
         editor.run();
 
-        editor.font.save();
+        let _ = editor.font.save();
     }
 
     fn run(&mut self) {
-        #[allow(unused_variables)]
-        let char_data = self.font.get_char(self.display_char);
         while self.window.is_open() {
             while let Some(event) = self.window.poll_event() {
                 match event {
