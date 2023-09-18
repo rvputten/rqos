@@ -27,6 +27,6 @@ fn main() {
     let font_name = "font";
     let font_size = Vector2i::new(10, 16);
     let grid_size: i32 = 32;
-    let scale = 4;
+    let scale = 3;
     font_editor::Editor::edit(font_name, font_size, grid_size, scale, window);
 }

@@ -11,7 +11,9 @@ use crate::font::Font;
 pub struct Editor {
     font_size: Vector2i,
     grid_size: i32,
+    scale: i32,
     grid_offset: Vector2i,
+    font_table_offset: Vector2i,
     window: RenderWindow,
     display_char: i32,
     font: Font,
@@ -25,18 +27,25 @@ impl Editor {
         scale: i32,
         window: RenderWindow,
     ) {
-        let grid_offset = Vector2i::new(font_size.x, font_size.y) * scale;
+        let font_width = font_size.x * scale;
+        let font_height = font_size.y * scale;
+        let grid_offset = Vector2i::new(font_width, font_height);
+        let grid_size_y = grid_size * font_size.y;
+        let font_table_offset =
+            Vector2i::new(grid_offset.x, grid_offset.y + grid_size_y + font_height);
         let font = if let Ok(font) = Font::load(font_name, font_size) {
             font
         } else {
             Font::new(font_name, font_size)
         };
 
-        let display_char = 'A' as i32;
+        let display_char = 'C' as i32;
         let mut editor = Self {
             font_size,
             grid_size,
+            scale,
             grid_offset,
+            font_table_offset,
             window,
             display_char,
             font,
@@ -63,7 +72,10 @@ impl Editor {
                 }
             }
 
+            self.window.clear(Color::BLACK);
+            self.draw_full_font_table();
             self.draw_grid();
+            self.window.display();
         }
     }
 
@@ -109,8 +121,6 @@ impl Editor {
         let grid_pos_color =
             |x: i32, y: i32, color: Color| Vertex::with_pos_color(grid_pos(x, y), color);
 
-        self.window.clear(Color::BLACK);
-
         // display char
         let mut sprite = self.font.get_sprite(self.display_char);
         sprite.set_position(grid_pos(0, 0));
@@ -120,7 +130,7 @@ impl Editor {
         // grid
         let mut vertex_buffer = VertexBuffer::new(
             PrimitiveType::LINES,
-            (4 + self.font_size.x * 2 + self.font_size.y * 2) as u32,
+            ((self.font_size.x + 1) * 2 + (self.font_size.y + 1) * 2) as u32,
             VertexBufferUsage::STATIC,
         );
         let grid_color = Color::rgb(128, 128, 128);
@@ -140,7 +150,15 @@ impl Editor {
         vertex_buffer.update(&vertices, 0);
 
         self.window.draw(&vertex_buffer);
+    }
 
-        self.window.display();
+    fn draw_full_font_table(&mut self) {
+        let mut sprite = self.font.get_sprite_full();
+        sprite.set_position(Vector2f::new(
+            self.font_table_offset.x as f32,
+            self.font_table_offset.y as f32,
+        ));
+        sprite.set_scale(Vector2f::new(self.scale as f32, self.scale as f32));
+        self.window.draw(&sprite);
     }
 }

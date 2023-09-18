@@ -2,8 +2,8 @@ use sfml::graphics::{Color, Image, IntRect, Sprite, Texture};
 use sfml::system::Vector2i;
 use sfml::SfBox;
 
-const NUM_CHARS: i32 = 256;
-const NUM_COLS: i32 = 16;
+pub const NUM_CHARS: i32 = 256;
+pub const NUM_COLS: i32 = 16;
 
 pub struct Font {
     pub name: String,
@@ -63,6 +63,18 @@ impl Font {
 
         let mut sprite = Sprite::with_texture(&self.texture);
         sprite.set_texture_rect(IntRect::new(x, y, self.char_size.x, self.char_size.y));
+        sprite
+    }
+
+    pub fn get_sprite_full(&self) -> Sprite {
+        let mut sprite = Sprite::with_texture(&self.texture);
+        let y_offset = (32 / NUM_COLS) * self.char_size.y; // ' '=32 is the first character
+        sprite.set_texture_rect(IntRect::new(
+            0,
+            y_offset,
+            self.image.size().x as i32,
+            self.image.size().y as i32,
+        ));
         sprite
     }
 
