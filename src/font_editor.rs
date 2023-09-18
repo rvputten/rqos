@@ -1,5 +1,6 @@
-use sfml::graphics::{Color, PrimitiveType, RenderTarget, RenderWindow, Vertex};
+use sfml::graphics::{Color, RectangleShape, RenderTarget, RenderWindow, Shape, Transformable};
 use sfml::system::{Vector2f, Vector2i};
+use sfml::window::mouse;
 use sfml::window::Event;
 
 use crate::char::Char;
@@ -16,7 +17,6 @@ pub struct Editor {
     display_char: usize,
     font: Font,
     current_char: Char,
-    current_color: u8,
 }
 
 impl Editor {
@@ -36,7 +36,6 @@ impl Editor {
 
         let display_char = 'A' as usize;
         let current_char = font.get_char(display_char);
-        let current_color = 0xff;
         let mut editor = Self {
             font_name: font_name.to_string(),
             font_size,
@@ -47,7 +46,6 @@ impl Editor {
             display_char,
             font,
             current_char,
-            current_color,
         };
         editor.run();
     }
@@ -55,33 +53,6 @@ impl Editor {
     fn run(&mut self) {
         #[allow(unused_variables)]
         let char_data = self.font.get_char(self.display_char);
-
-        let grid_pos = |x: i32, y: i32, color: Color| {
-            Vertex::with_pos_color(
-                Vector2f::new(
-                    (x * self.grid_size.x + self.grid_offset.x) as f32,
-                    (y * self.grid_size.y + self.grid_offset.y) as f32,
-                ),
-                color,
-            )
-        };
-
-        let mut grid = Vec::new();
-
-        for x in 0..=self.font_size.x {
-            grid.push(vec![
-                grid_pos(x, 0, Color::BLACK),
-                grid_pos(x, self.font_size.y, Color::BLACK),
-            ]);
-        }
-
-        for y in 0..=self.font_size.y {
-            grid.push(vec![
-                grid_pos(0, y, Color::BLACK),
-                grid_pos(self.font_size.x, y, Color::BLACK),
-            ]);
-        }
-
         while self.window.is_open() {
             while let Some(event) = self.window.poll_event() {
                 match event {
@@ -90,27 +61,60 @@ impl Editor {
                         code: sfml::window::Key::Escape,
                         ..
                     } => self.window.close(),
-                    Event::MouseButtonPressed {
-                        button: sfml::window::mouse::Button::Left,
-                        x,
-                        y,
-                    } => {
-                        self.current_char.set_pixel(
-                            ((x - self.grid_offset.x) / self.grid_size.x) as usize,
-                            ((y - self.grid_offset.y) / self.grid_size.y) as usize,
-                            self.current_color,
-                        );
-                    }
+                    Event::MouseButtonPressed { button, x, y } => self.set_pixel(button, x, y),
                     _ => {}
                 }
             }
 
-            self.window.clear(Color::WHITE);
-            for v in &grid {
-                self.window
-                    .draw_primitives(v, PrimitiveType::LINES, &Default::default());
-            }
-            self.window.display();
+            self.draw_grid();
         }
+    }
+
+    fn set_pixel(&mut self, button: mouse::Button, x: i32, y: i32) {
+        let color = match button {
+            mouse::Button::Left => 0xff,
+            mouse::Button::Middle => 0x80,
+            mouse::Button::Right => 0x00,
+            _ => return,
+        };
+
+        let pixel_x = ((x - self.grid_offset.x) / self.grid_size.x) as usize;
+        let pixel_y = ((y - self.grid_offset.y) / self.grid_size.y) as usize;
+        if pixel_x < self.font_size.x as usize && pixel_y < self.font_size.y as usize {
+            eprintln!("{} {}", pixel_x, pixel_y);
+            self.current_char.set_pixel(pixel_x, pixel_y, color);
+        }
+    }
+
+    fn draw_grid(&mut self) {
+        let grid_pos = |x: i32, y: i32| {
+            Vector2f::new(
+                (x * self.grid_size.x + self.grid_offset.x) as f32,
+                (y * self.grid_size.y + self.grid_offset.y) as f32,
+            )
+        };
+
+        let pixels = &self.current_char.pixels;
+        for y in 0..self.font_size.y {
+            for x in 0..self.font_size.x {
+                let brightness = pixels[y as usize][x as usize];
+                let color = Color::rgb(brightness, brightness, brightness);
+
+                let mut square = RectangleShape::new();
+                square.set_size(Vector2f::new(
+                    self.grid_size.x as f32,
+                    self.grid_size.y as f32,
+                ));
+                square.set_fill_color(color);
+                square.set_outline_thickness(2.0);
+                square.set_outline_color(Color::rgb(128, 128, 128));
+                square.set_position(grid_pos(x, y));
+
+                self.window.draw(&square);
+            }
+        }
+
+        //self.window.clear(Color::WHITE);
+        self.window.display();
     }
 }

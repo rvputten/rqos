@@ -27,7 +27,6 @@ impl fmt::Display for Char {
 }
 
 impl Char {
-    #[allow(dead_code)]
     pub fn new_empty() -> Self {
         Self { pixels: vec![] }
     }
@@ -38,7 +37,6 @@ impl Char {
         }
     }
 
-    #[allow(dead_code)]
     pub fn from_ascii(s: &str) -> Self {
         let mut pixels = Vec::new();
         for line in s.lines() {
@@ -58,7 +56,9 @@ impl Char {
     }
 
     pub fn set_pixel(&mut self, x: usize, y: usize, value: u8) {
-        self.pixels[y][x] = value;
+        if y < self.pixels.len() && x < self.pixels[y].len() {
+            self.pixels[y][x] = value;
+        }
     }
 
     pub fn save(&self, file: &mut std::fs::File) -> std::io::Result<()> {

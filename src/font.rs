@@ -22,7 +22,6 @@ impl Font {
         }
     }
 
-    #[allow(dead_code)]
     fn filename(name: &str, char_size: Vector2i) -> String {
         format!("resources/{}_{}x{}.bin", name, char_size.x, char_size.y)
     }
