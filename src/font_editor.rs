@@ -47,7 +47,10 @@ impl Editor {
             font,
             current_char,
         };
+
         editor.run();
+
+        editor.font.save();
     }
 
     fn run(&mut self) {
@@ -61,7 +64,9 @@ impl Editor {
                         code: sfml::window::Key::Escape,
                         ..
                     } => self.window.close(),
-                    Event::MouseButtonPressed { button, x, y } => self.set_pixel(button, x, y),
+                    Event::MouseButtonPressed { button, x, y } => self.mouse_pressed(button, x, y),
+                    // mouse moved
+                    Event::MouseMoved { x, y } => self.mouse_moved(x, y),
                     _ => {}
                 }
             }
@@ -70,19 +75,36 @@ impl Editor {
         }
     }
 
-    fn set_pixel(&mut self, button: mouse::Button, x: i32, y: i32) {
+    fn mouse_moved(&mut self, x: i32, y: i32) {
+        let color = if mouse::Button::Left.is_pressed() {
+            0xff
+        } else if mouse::Button::Middle.is_pressed() {
+            0x80
+        } else if mouse::Button::Right.is_pressed() {
+            0x00
+        } else {
+            return;
+        };
+        self.set_pixel(color, x, y);
+    }
+
+    fn mouse_pressed(&mut self, button: mouse::Button, x: i32, y: i32) {
         let color = match button {
             mouse::Button::Left => 0xff,
             mouse::Button::Middle => 0x80,
             mouse::Button::Right => 0x00,
             _ => return,
         };
+        self.set_pixel(color, x, y);
+    }
 
+    fn set_pixel(&mut self, color: u8, x: i32, y: i32) {
         let pixel_x = ((x - self.grid_offset.x) / self.grid_size.x) as usize;
         let pixel_y = ((y - self.grid_offset.y) / self.grid_size.y) as usize;
         if pixel_x < self.font_size.x as usize && pixel_y < self.font_size.y as usize {
-            eprintln!("{} {}", pixel_x, pixel_y);
             self.current_char.set_pixel(pixel_x, pixel_y, color);
+            self.font
+                .set_char(self.display_char, self.current_char.clone());
         }
     }
 
@@ -94,11 +116,13 @@ impl Editor {
             )
         };
 
+        self.window.clear(Color::BLACK);
+
         let pixels = &self.current_char.pixels;
         for y in 0..self.font_size.y {
             for x in 0..self.font_size.x {
                 let brightness = pixels[y as usize][x as usize];
-                let color = Color::rgb(brightness, brightness, brightness);
+                let color = Color::rgb(255 - brightness, 255 - brightness, 255 - brightness);
 
                 let mut square = RectangleShape::new();
                 square.set_size(Vector2f::new(
@@ -114,7 +138,6 @@ impl Editor {
             }
         }
 
-        //self.window.clear(Color::WHITE);
         self.window.display();
     }
 }
