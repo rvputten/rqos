@@ -6,6 +6,7 @@ use sfml::system::{Vector2f, Vector2i};
 use sfml::window::mouse;
 use sfml::window::Event;
 
+use crate::font;
 use crate::font::Font;
 
 pub struct Editor {
@@ -39,7 +40,7 @@ impl Editor {
             Font::new(font_name, font_size)
         };
 
-        let display_char = 'C' as i32;
+        let display_char = 'Q' as i32;
         let mut editor = Self {
             font_size,
             grid_size,
@@ -100,6 +101,9 @@ impl Editor {
             _ => return,
         };
         self.set_pixel(color, x, y);
+        if button == mouse::Button::Left {
+            self.chose_display_char(x, y);
+        }
     }
 
     fn set_pixel(&mut self, color: u8, x: i32, y: i32) {
@@ -108,6 +112,21 @@ impl Editor {
         if pixel_x < self.font_size.x && pixel_y < self.font_size.y {
             self.font
                 .set_pixel(self.display_char, pixel_x, pixel_y, color);
+        }
+    }
+
+    fn chose_display_char(&mut self, x: i32, y: i32) {
+        let font_grid_pos = Vector2i::new(
+            (x - self.font_table_offset.x) / self.font_size.x / self.scale,
+            (y - self.font_table_offset.y) / self.font_size.y / self.scale,
+        );
+        if font_grid_pos.x >= 0
+            && font_grid_pos.x < font::NUM_COLS
+            && font_grid_pos.y >= 0
+            && font_grid_pos.y < font::NUM_ROWS
+        {
+            self.display_char =
+                (font_grid_pos.y + font::NUM_ROWS_IGNORED) * font::NUM_COLS + font_grid_pos.x;
         }
     }
 

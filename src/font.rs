@@ -4,6 +4,9 @@ use sfml::SfBox;
 
 pub const NUM_CHARS: i32 = 256;
 pub const NUM_COLS: i32 = 16;
+pub const NUM_ROWS: i32 = NUM_CHARS / NUM_COLS;
+pub const NUM_CHARS_IGNORED: i32 = 32;
+pub const NUM_ROWS_IGNORED: i32 = NUM_CHARS_IGNORED / NUM_COLS;
 
 pub struct Font {
     pub name: String,
@@ -16,7 +19,7 @@ impl Font {
     pub fn new(name: &str, char_size: Vector2i) -> Self {
         let image = Image::new(
             (char_size.x * NUM_COLS) as u32,
-            (char_size.y * NUM_CHARS / NUM_COLS) as u32,
+            (char_size.y * NUM_ROWS) as u32,
         );
         let mut texture = Texture::new().expect("Failed to create texture");
         texture
@@ -68,7 +71,7 @@ impl Font {
 
     pub fn get_sprite_full(&self) -> Sprite {
         let mut sprite = Sprite::with_texture(&self.texture);
-        let y_offset = (32 / NUM_COLS) * self.char_size.y; // ' '=32 is the first character
+        let y_offset = NUM_ROWS_IGNORED * self.char_size.y; // ' '=32 is the first character
         sprite.set_texture_rect(IntRect::new(
             0,
             y_offset,
