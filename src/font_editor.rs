@@ -1,26 +1,27 @@
-use sfml::graphics::{Color, RectangleShape, RenderTarget, RenderWindow, Shape, Transformable};
+use sfml::graphics::{
+    Color, PrimitiveType, RenderTarget, RenderWindow, Transformable, Vertex, VertexBuffer,
+    VertexBufferUsage,
+};
 use sfml::system::{Vector2f, Vector2i};
 use sfml::window::mouse;
 use sfml::window::Event;
 
-use crate::char::Char;
 use crate::font::Font;
 
 pub struct Editor {
     font_size: Vector2i,
-    grid_size: Vector2i,
+    grid_size: i32,
     grid_offset: Vector2i,
     window: RenderWindow,
-    display_char: usize,
+    display_char: i32,
     font: Font,
-    current_char: Char,
 }
 
 impl Editor {
     pub fn edit(
         font_name: &str,
         font_size: Vector2i,
-        grid_size: Vector2i,
+        grid_size: i32,
         scale: i32,
         window: RenderWindow,
     ) {
@@ -31,8 +32,7 @@ impl Editor {
             Font::new(font_name, font_size)
         };
 
-        let display_char = 'A' as usize;
-        let current_char = font.get_char(display_char);
+        let display_char = 'A' as i32;
         let mut editor = Self {
             font_size,
             grid_size,
@@ -40,7 +40,6 @@ impl Editor {
             window,
             display_char,
             font,
-            current_char,
         };
 
         editor.run();
@@ -92,44 +91,55 @@ impl Editor {
     }
 
     fn set_pixel(&mut self, color: u8, x: i32, y: i32) {
-        let pixel_x = ((x - self.grid_offset.x) / self.grid_size.x) as usize;
-        let pixel_y = ((y - self.grid_offset.y) / self.grid_size.y) as usize;
-        if pixel_x < self.font_size.x as usize && pixel_y < self.font_size.y as usize {
-            self.current_char.set_pixel(pixel_x, pixel_y, color);
+        let pixel_x = (x - self.grid_offset.x) / self.grid_size;
+        let pixel_y = (y - self.grid_offset.y) / self.grid_size;
+        if pixel_x < self.font_size.x && pixel_y < self.font_size.y {
             self.font
-                .set_char(self.display_char, self.current_char.clone());
+                .set_pixel(self.display_char, pixel_x, pixel_y, color);
         }
     }
 
     fn draw_grid(&mut self) {
         let grid_pos = |x: i32, y: i32| {
             Vector2f::new(
-                (x * self.grid_size.x + self.grid_offset.x) as f32,
-                (y * self.grid_size.y + self.grid_offset.y) as f32,
+                (x * self.grid_size + self.grid_offset.x) as f32,
+                (y * self.grid_size + self.grid_offset.y) as f32,
             )
         };
+        let grid_pos_color =
+            |x: i32, y: i32, color: Color| Vertex::with_pos_color(grid_pos(x, y), color);
 
         self.window.clear(Color::BLACK);
 
-        let pixels = &self.current_char.pixels;
-        for y in 0..self.font_size.y {
-            for x in 0..self.font_size.x {
-                let brightness = pixels[y as usize][x as usize];
-                let color = Color::rgb(255 - brightness, 255 - brightness, 255 - brightness);
+        // display char
+        let mut sprite = self.font.get_sprite(self.display_char);
+        sprite.set_position(grid_pos(0, 0));
+        sprite.set_scale(Vector2f::new(self.grid_size as f32, self.grid_size as f32));
+        self.window.draw(&sprite);
 
-                let mut square = RectangleShape::new();
-                square.set_size(Vector2f::new(
-                    self.grid_size.x as f32,
-                    self.grid_size.y as f32,
-                ));
-                square.set_fill_color(color);
-                square.set_outline_thickness(2.0);
-                square.set_outline_color(Color::rgb(128, 128, 128));
-                square.set_position(grid_pos(x, y));
+        // grid
+        let mut vertex_buffer = VertexBuffer::new(
+            PrimitiveType::LINES,
+            (4 + self.font_size.x * 2 + self.font_size.y * 2) as u32,
+            VertexBufferUsage::STATIC,
+        );
+        let grid_color = Color::rgb(128, 128, 128);
+        let mut vertices = Vec::new();
 
-                self.window.draw(&square);
-            }
+        // horizontal lines
+        for x in 0..=self.font_size.x {
+            vertices.push(grid_pos_color(x, 0, grid_color));
+            vertices.push(grid_pos_color(x, self.font_size.y, grid_color));
         }
+        // vertical lines
+        for y in 0..=self.font_size.y {
+            vertices.push(grid_pos_color(0, y, grid_color));
+            vertices.push(grid_pos_color(self.font_size.x, y, grid_color));
+        }
+
+        vertex_buffer.update(&vertices, 0);
+
+        self.window.draw(&vertex_buffer);
 
         self.window.display();
     }
