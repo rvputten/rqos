@@ -95,6 +95,10 @@ impl Editor {
         match code {
             Key::Escape => self.window.close(),
             Key::C => self.copy_char(),
+            Key::Left => self.font.shift_char(self.display_char, -1, 0),
+            Key::Right => self.font.shift_char(self.display_char, 1, 0),
+            Key::Up => self.font.shift_char(self.display_char, 0, -1),
+            Key::Down => self.font.shift_char(self.display_char, 0, 1),
             _ => {}
         }
     }
