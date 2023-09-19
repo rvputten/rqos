@@ -9,10 +9,10 @@ fn main() {
     let desktop_mode = sfml::window::VideoMode::desktop_mode();
     let screen_width = desktop_mode.width;
     let screen_height = desktop_mode.height;
-    let (window_width, window_height) = (screen_width / 4, screen_height / 4);
+    let (window_width, window_height) = (screen_width / 3, screen_height / 3);
     let (window_pos_x, window_pos_y) = (
-        ((screen_width / 4) - (window_width / 8)) as i32,
-        ((screen_height * 3 / 4) - (window_height / 8)) as i32,
+        ((screen_width) - (window_width / 2)) as i32,
+        ((screen_height / 2) - (window_height / 2)) as i32,
     );
 
     let mut window = RenderWindow::new(
@@ -26,7 +26,7 @@ fn main() {
 
     let font_name = "font";
     let font_size = Vector2i::new(10, 16);
-    let grid_size: i32 = 32;
-    let scale = 3;
-    font_editor::Editor::edit(font_name, font_size, grid_size, scale, window);
+    let edit_char_scale: i32 = 48;
+    let font_scale = 3;
+    font_editor::Editor::edit(font_name, font_size, edit_char_scale, font_scale, window);
 }

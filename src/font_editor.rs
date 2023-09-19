@@ -5,15 +5,16 @@ use sfml::graphics::{
 use sfml::system::{Vector2f, Vector2i};
 use sfml::window::mouse;
 use sfml::window::Event;
+use sfml::window::Key;
 
 use crate::font;
 use crate::font::Font;
 
 pub struct Editor {
     font_size: Vector2i,
-    grid_size: i32,
-    scale: i32,
-    grid_offset: Vector2i,
+    edit_char_scale: i32,
+    font_scale: i32,
+    edit_char_offset: Vector2i,
     font_table_offset: Vector2i,
     window: RenderWindow,
     display_char: i32,
@@ -24,16 +25,18 @@ impl Editor {
     pub fn edit(
         font_name: &str,
         font_size: Vector2i,
-        grid_size: i32,
-        scale: i32,
+        edit_char_scale: i32,
+        font_scale: i32,
         window: RenderWindow,
     ) {
-        let font_width = font_size.x * scale;
-        let font_height = font_size.y * scale;
-        let grid_offset = Vector2i::new(font_width, font_height);
-        let grid_size_y = grid_size * font_size.y;
-        let font_table_offset =
-            Vector2i::new(grid_offset.x, grid_offset.y + grid_size_y + font_height);
+        let font_width = font_size.x * font_scale;
+        let font_height = font_size.y * font_scale;
+        let edit_char_offset = Vector2i::new(font_width, font_height);
+        let grid_size_y = edit_char_scale * font_size.y;
+        let font_table_offset = Vector2i::new(
+            edit_char_offset.x,
+            edit_char_offset.y + grid_size_y + font_height,
+        );
         let font = if let Ok(font) = Font::load(font_name, font_size) {
             font
         } else {
@@ -43,9 +46,9 @@ impl Editor {
         let display_char = 'Q' as i32;
         let mut editor = Self {
             font_size,
-            grid_size,
-            scale,
-            grid_offset,
+            edit_char_scale,
+            font_scale,
+            edit_char_offset,
             font_table_offset,
             window,
             display_char,
@@ -62,10 +65,7 @@ impl Editor {
             while let Some(event) = self.window.poll_event() {
                 match event {
                     Event::Closed => self.window.close(),
-                    Event::KeyPressed {
-                        code: sfml::window::Key::Escape,
-                        ..
-                    } => self.window.close(),
+                    Event::KeyPressed { code, .. } => self.key_pressed(code),
                     Event::MouseButtonPressed { button, x, y } => self.mouse_pressed(button, x, y),
                     // mouse moved
                     Event::MouseMoved { x, y } => self.mouse_moved(x, y),
@@ -77,6 +77,14 @@ impl Editor {
             self.draw_full_font_table();
             self.draw_grid();
             self.window.display();
+        }
+    }
+
+    fn key_pressed(&mut self, code: Key) {
+        match code {
+            Key::Escape => self.window.close(),
+            Key::C => self.copy_char(),
+            _ => {}
         }
     }
 
@@ -102,39 +110,53 @@ impl Editor {
         };
         self.set_pixel(color, x, y);
         if button == mouse::Button::Left {
-            self.chose_display_char(x, y);
+            self.pick_edit_char(x, y);
+        }
+    }
+
+    fn copy_char(&mut self) {
+        let mouse_pos = self.window.mouse_position();
+        if let Some(ch) = self.pick_char(mouse_pos.x, mouse_pos.y) {
+            self.font.copy_char(ch, self.display_char);
         }
     }
 
     fn set_pixel(&mut self, color: u8, x: i32, y: i32) {
-        let pixel_x = (x - self.grid_offset.x) / self.grid_size;
-        let pixel_y = (y - self.grid_offset.y) / self.grid_size;
+        let pixel_x = (x - self.edit_char_offset.x) / self.edit_char_scale;
+        let pixel_y = (y - self.edit_char_offset.y) / self.edit_char_scale;
         if pixel_x < self.font_size.x && pixel_y < self.font_size.y {
             self.font
                 .set_pixel(self.display_char, pixel_x, pixel_y, color);
         }
     }
 
-    fn chose_display_char(&mut self, x: i32, y: i32) {
+    fn pick_edit_char(&mut self, x: i32, y: i32) {
+        if let Some(char) = self.pick_char(x, y) {
+            self.display_char = char;
+        }
+    }
+
+    fn pick_char(&self, x: i32, y: i32) -> Option<i32> {
         let font_grid_pos = Vector2i::new(
-            (x - self.font_table_offset.x) / self.font_size.x / self.scale,
-            (y - self.font_table_offset.y) / self.font_size.y / self.scale,
+            (x - self.font_table_offset.x) / self.font_size.x / self.font_scale,
+            (y - self.font_table_offset.y) / self.font_size.y / self.font_scale,
         );
         if font_grid_pos.x >= 0
             && font_grid_pos.x < font::NUM_COLS
             && font_grid_pos.y >= 0
             && font_grid_pos.y < font::NUM_ROWS
         {
-            self.display_char =
-                (font_grid_pos.y + font::NUM_ROWS_IGNORED) * font::NUM_COLS + font_grid_pos.x;
+            Some((font_grid_pos.y + font::NUM_ROWS_IGNORED) * font::NUM_COLS + font_grid_pos.x)
+        } else {
+            None
         }
     }
 
     fn draw_grid(&mut self) {
         let grid_pos = |x: i32, y: i32| {
             Vector2f::new(
-                (x * self.grid_size + self.grid_offset.x) as f32,
-                (y * self.grid_size + self.grid_offset.y) as f32,
+                (x * self.edit_char_scale + self.edit_char_offset.x) as f32,
+                (y * self.edit_char_scale + self.edit_char_offset.y) as f32,
             )
         };
         let grid_pos_color =
@@ -143,7 +165,10 @@ impl Editor {
         // display char
         let mut sprite = self.font.get_sprite(self.display_char);
         sprite.set_position(grid_pos(0, 0));
-        sprite.set_scale(Vector2f::new(self.grid_size as f32, self.grid_size as f32));
+        sprite.set_scale(Vector2f::new(
+            self.edit_char_scale as f32,
+            self.edit_char_scale as f32,
+        ));
         self.window.draw(&sprite);
 
         // grid
@@ -177,7 +202,10 @@ impl Editor {
             self.font_table_offset.x as f32,
             self.font_table_offset.y as f32,
         ));
-        sprite.set_scale(Vector2f::new(self.scale as f32, self.scale as f32));
+        sprite.set_scale(Vector2f::new(
+            self.font_scale as f32,
+            self.font_scale as f32,
+        ));
         self.window.draw(&sprite);
     }
 }

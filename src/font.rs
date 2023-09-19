@@ -91,6 +91,27 @@ impl Font {
         };
     }
 
+    pub fn copy_char(&mut self, source_char: i32, destination_char: i32) {
+        let source_x = (source_char % NUM_COLS) * self.char_size.x;
+        let source_y = (source_char / NUM_COLS) * self.char_size.y;
+        let destination_x = (destination_char % NUM_COLS) * self.char_size.x;
+        let destination_y = (destination_char / NUM_COLS) * self.char_size.y;
+
+        let rect = IntRect::new(source_x, source_y, self.char_size.x, self.char_size.y);
+        let copy = self.image.clone();
+        unsafe {
+            self.image.copy_image(
+                &copy,
+                destination_x as u32,
+                destination_y as u32,
+                rect,
+                false,
+            );
+
+            self.texture.update_from_image(&self.image, 0, 0);
+        }
+    }
+
     pub fn save(&self) -> std::io::Result<()> {
         let filename = Self::filename(&self.name, self.char_size);
 
