@@ -226,47 +226,52 @@ impl Editor {
     }
 
     fn draw_sample_text(&mut self) {
+        let mut text_pos = self.sample_text_offset;
+        let mut draw_text = |s: &str, color: Color| {
+            self.font
+                .draw_text(s, text_pos, self.sample_text_scale, color, &mut self.window);
+            text_pos.y += self.font_size.y * self.sample_text_scale;
+        };
+
         let text = "The quick brown fox jumps over the lazy dog.";
-        let text_uppercase = text.to_uppercase();
-        let text_lowercase = text.to_lowercase();
 
-        let text_color = Color::WHITE;
-        let text_color_uppercase = Color::rgb(0xc0, 0xc0, 0xff);
-        let text_color_lowercase = Color::rgb(0xff, 0xc0, 0xc0);
+        draw_text(text, Color::WHITE);
+        draw_text(&text.to_uppercase(), Color::rgb(0xc0, 0xc0, 0xff));
+        draw_text(&text.to_lowercase(), Color::rgb(0xff, 0xc0, 0xc0));
+        let text2 = r#"
+Indeed, the quick brown fox - agile, bold, and cunning - jumped over
+the lazy dog; surprisingly, it didn't even break a sweat! However,
+the dog, perplexed, thought: 'Why on earth would it do that?' Then,
+the fox replied, \"Why not?\" and sent an email to its friend
+@foxmail.com, writing: 'Had a great day/night, outsmarted a dog
+again!'. The fox then looked at its reflection in the river, seeing
+a victorious smile [or was it a smirk?] in the mirror-like surface."#;
+        for line in text2.lines() {
+            draw_text(line, Color::rgb(0xc0, 0xff, 0xc0));
+        }
 
-        let text_pos = self.sample_text_offset;
-        let text_pos_uppercase = Vector2i::new(
-            text_pos.x,
-            text_pos.y + self.font_size.y * self.sample_text_scale,
-        );
-        let text_pos_lowercase = Vector2i::new(
-            text_pos.x,
-            text_pos.y + self.font_size.y * self.sample_text_scale * 2,
-        );
+        for line in (r#"
+Jack, the quick brown fox, exclaimed, 'I've outsmarted 10 dogs, earned
+$100, and I'm still #1 in the forest!' before he dashed off into the
+night."#)
+            .lines()
+        {
+            draw_text(line, Color::rgb(0xff, 0xc0, 0xff));
+        }
 
-        self.font.draw_text(
-            text,
-            text_pos,
-            self.sample_text_scale,
-            text_color,
-            &mut self.window,
-        );
+        for line in (r#"
+0123456789"#)
+            .lines()
+        {
+            draw_text(line, Color::rgb(0xff, 0xff, 0xc0));
+        }
 
-        self.font.draw_text(
-            &text_uppercase,
-            text_pos_uppercase,
-            self.sample_text_scale,
-            text_color_uppercase,
-            &mut self.window,
-        );
-
-        self.font.draw_text(
-            &text_lowercase,
-            text_pos_lowercase,
-            self.sample_text_scale,
-            text_color_lowercase,
-            &mut self.window,
-        );
+        for line in (r#"
+!"\#$%&'()*+,-./:;<=>?@[\]^_`{|}~"#)
+            .lines()
+        {
+            draw_text(line, Color::rgb(0xc0, 0xff, 0xff));
+        }
     }
 
     fn draw_full_font_table(&mut self) {
