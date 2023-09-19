@@ -27,7 +27,7 @@ fn main() {
     let font_name = "font";
     let font_size = Vector2i::new(10, 16);
     let edit_char_scale: i32 = 48;
-    let font_scale = 3;
+    let font_scale = 4;
     let sample_text_scale = 2;
     font_editor::Editor::edit(
         font_name,

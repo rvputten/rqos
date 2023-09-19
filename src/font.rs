@@ -114,6 +114,50 @@ impl Font {
         }
     }
 
+    pub fn flip_char_horizontal(&mut self, ch: i32) {
+        let x = (ch % NUM_COLS) * self.char_size.x;
+        let y = (ch / NUM_COLS) * self.char_size.y;
+        let width = self.char_size.x;
+        let height = self.char_size.y;
+
+        let copy = self.image.clone();
+        unsafe {
+            for i in 0..width {
+                for j in 0..height {
+                    let color = copy.pixel_at((x + i) as u32, (y + j) as u32);
+                    self.image.set_pixel(
+                        (x + width - i - 1) as u32,
+                        (y + j) as u32,
+                        Color::rgb(color.r, color.g, color.b),
+                    );
+                }
+            }
+            self.texture.update_from_image(&self.image, 0, 0);
+        }
+    }
+
+    pub fn flip_char_vertical(&mut self, ch: i32) {
+        let x = (ch % NUM_COLS) * self.char_size.x;
+        let y = (ch / NUM_COLS) * self.char_size.y;
+        let width = self.char_size.x;
+        let height = self.char_size.y;
+
+        let copy = self.image.clone();
+        unsafe {
+            for i in 0..width {
+                for j in 0..height {
+                    let color = copy.pixel_at((x + i) as u32, (y + j) as u32);
+                    self.image.set_pixel(
+                        (x + i) as u32,
+                        (y + height - j - 1) as u32,
+                        Color::rgb(color.r, color.g, color.b),
+                    );
+                }
+            }
+            self.texture.update_from_image(&self.image, 0, 0);
+        }
+    }
+
     pub fn shift_char(&mut self, ch: i32, dx: i32, dy: i32) {
         let x = (ch % NUM_COLS) * self.char_size.x;
         let y = (ch / NUM_COLS) * self.char_size.y;

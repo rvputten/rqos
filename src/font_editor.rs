@@ -96,6 +96,8 @@ impl Editor {
         match code {
             Key::Escape => self.window.close(),
             Key::C => self.copy_char(),
+            Key::H => self.font.flip_char_horizontal(self.display_char),
+            Key::V => self.font.flip_char_vertical(self.display_char),
             Key::Left => self.font.shift_char(self.display_char, -1, 0),
             Key::Right => self.font.shift_char(self.display_char, 1, 0),
             Key::Up => self.font.shift_char(self.display_char, 0, -1),
@@ -242,7 +244,7 @@ impl Editor {
 Indeed, the quick brown fox - agile, bold, and cunning - jumped over
 the lazy dog; surprisingly, it didn't even break a sweat! However,
 the dog, perplexed, thought: 'Why on earth would it do that?' Then,
-the fox replied, \"Why not?\" and sent an email to its friend
+the fox replied, "Why not?" and sent an email to its friend
 @foxmail.com, writing: 'Had a great day/night, outsmarted a dog
 again!'. The fox then looked at its reflection in the river, seeing
 a victorious smile [or was it a smirk?] in the mirror-like surface."#;
@@ -260,17 +262,22 @@ night."#)
         }
 
         for line in (r#"
-0123456789"#)
-            .lines()
-        {
-            draw_text(line, Color::rgb(0xff, 0xff, 0xc0));
-        }
-
-        for line in (r#"
-!"\#$%&'()*+,-./:;<=>?@[\]^_`{|}~"#)
+0123456789!"\#$%&'()*+,-./:;<=>?@[\]^_`{|}~"#)
             .lines()
         {
             draw_text(line, Color::rgb(0xc0, 0xff, 0xff));
+        }
+
+        for line in (r#"
+fn main() {
+    let _a = 1+1; // 2
+    let _b = 2*2; // 4
+    let _c = 3/3; // 1
+    let _d = 4-4; // 0
+}"#)
+        .lines()
+        {
+            draw_text(line, Color::rgb(0xff, 0xff, 0xc0));
         }
     }
 
