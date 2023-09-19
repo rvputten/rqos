@@ -14,8 +14,10 @@ pub struct Editor {
     font_size: Vector2i,
     edit_char_scale: i32,
     font_scale: i32,
+    sample_text_scale: i32,
     edit_char_offset: Vector2i,
     font_table_offset: Vector2i,
+    sample_text_offset: Vector2i,
     window: RenderWindow,
     display_char: i32,
     font: Font,
@@ -27,15 +29,21 @@ impl Editor {
         font_size: Vector2i,
         edit_char_scale: i32,
         font_scale: i32,
+        sample_text_scale: i32,
         window: RenderWindow,
     ) {
         let font_width = font_size.x * font_scale;
         let font_height = font_size.y * font_scale;
         let edit_char_offset = Vector2i::new(font_width, font_height);
-        let grid_size_y = edit_char_scale * font_size.y;
+        let edit_char_size =
+            Vector2i::new(font_size.x * edit_char_scale, font_size.y * edit_char_scale);
+        let sample_text_offset = Vector2i::new(
+            edit_char_size.x + edit_char_offset.x + font_width,
+            font_height,
+        );
         let font_table_offset = Vector2i::new(
             edit_char_offset.x,
-            edit_char_offset.y + grid_size_y + font_height,
+            edit_char_offset.y + edit_char_size.y + font_height,
         );
         let font = if let Ok(font) = Font::load(font_name, font_size) {
             font
@@ -43,13 +51,15 @@ impl Editor {
             Font::new(font_name, font_size)
         };
 
-        let display_char = 'Q' as i32;
+        let display_char = 'a' as i32;
         let mut editor = Self {
             font_size,
             edit_char_scale,
             font_scale,
+            sample_text_scale,
             edit_char_offset,
             font_table_offset,
+            sample_text_offset,
             window,
             display_char,
             font,
@@ -75,7 +85,8 @@ impl Editor {
 
             self.window.clear(Color::BLACK);
             self.draw_full_font_table();
-            self.draw_grid();
+            self.draw_sample_text();
+            self.draw_edit_char();
             self.window.display();
         }
     }
@@ -152,7 +163,7 @@ impl Editor {
         }
     }
 
-    fn draw_grid(&mut self) {
+    fn draw_edit_char(&mut self) {
         let grid_pos = |x: i32, y: i32| {
             Vector2f::new(
                 (x * self.edit_char_scale + self.edit_char_offset.x) as f32,
@@ -194,6 +205,50 @@ impl Editor {
         vertex_buffer.update(&vertices, 0);
 
         self.window.draw(&vertex_buffer);
+    }
+
+    fn draw_sample_text(&mut self) {
+        let text = "The quick brown fox jumps over the lazy dog.";
+        let text_uppercase = text.to_uppercase();
+        let text_lowercase = text.to_lowercase();
+
+        let text_color = Color::WHITE;
+        let text_color_uppercase = Color::rgb(0xc0, 0xc0, 0xff);
+        let text_color_lowercase = Color::rgb(0xff, 0xc0, 0xc0);
+
+        let text_pos = self.sample_text_offset;
+        let text_pos_uppercase = Vector2i::new(
+            text_pos.x,
+            text_pos.y + self.font_size.y * self.sample_text_scale,
+        );
+        let text_pos_lowercase = Vector2i::new(
+            text_pos.x,
+            text_pos.y + self.font_size.y * self.sample_text_scale * 2,
+        );
+
+        self.font.draw_text(
+            text,
+            text_pos,
+            self.sample_text_scale,
+            text_color,
+            &mut self.window,
+        );
+
+        self.font.draw_text(
+            &text_uppercase,
+            text_pos_uppercase,
+            self.sample_text_scale,
+            text_color_uppercase,
+            &mut self.window,
+        );
+
+        self.font.draw_text(
+            &text_lowercase,
+            text_pos_lowercase,
+            self.sample_text_scale,
+            text_color_lowercase,
+            &mut self.window,
+        );
     }
 
     fn draw_full_font_table(&mut self) {

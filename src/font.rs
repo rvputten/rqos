@@ -1,5 +1,7 @@
-use sfml::graphics::{Color, Image, IntRect, Sprite, Texture};
-use sfml::system::Vector2i;
+use sfml::graphics::{
+    Color, Image, IntRect, RenderTarget, RenderWindow, Sprite, Texture, Transformable,
+};
+use sfml::system::{Vector2f, Vector2i};
 use sfml::SfBox;
 
 pub const NUM_CHARS: i32 = 256;
@@ -122,6 +124,31 @@ impl Font {
                 std::io::ErrorKind::Other,
                 "Failed to save image",
             ))
+        }
+    }
+
+    pub fn draw_text(
+        &self,
+        text: &str,
+        pos: Vector2i,
+        scale: i32,
+        color: Color,
+        window: &mut RenderWindow,
+    ) {
+        let mut x = pos.x;
+        let mut y = pos.y;
+        for ch in text.chars() {
+            if ch == '\n' {
+                x = pos.x;
+                y += self.char_size.y * scale;
+            } else {
+                let mut sprite = self.get_sprite(ch as i32);
+                sprite.set_position(Vector2f::new(x as f32, y as f32));
+                sprite.set_scale(Vector2f::new(scale as f32, scale as f32));
+                sprite.set_color(color);
+                window.draw(&sprite);
+                x += self.char_size.x * scale;
+            }
         }
     }
 }
