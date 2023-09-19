@@ -1,5 +1,5 @@
 use sfml::graphics::{
-    Color, PrimitiveType, RenderTarget, RenderWindow, Transformable, Vertex, VertexBuffer,
+    Color, PrimitiveType, RenderTarget, RenderWindow, Shape, Transformable, Vertex, VertexBuffer,
     VertexBufferUsage,
 };
 use sfml::system::{Vector2f, Vector2i};
@@ -77,7 +77,6 @@ impl Editor {
                     Event::Closed => self.window.close(),
                     Event::KeyPressed { code, .. } => self.key_pressed(code),
                     Event::MouseButtonPressed { button, x, y } => self.mouse_pressed(button, x, y),
-                    // mouse moved
                     Event::MouseMoved { x, y } => self.mouse_moved(x, y),
                     _ => {}
                 }
@@ -85,6 +84,8 @@ impl Editor {
 
             self.window.clear(Color::BLACK);
             self.draw_full_font_table();
+            self.draw_active_char_border();
+            self.draw_hover_char_border();
             self.draw_sample_text();
             self.draw_edit_char();
             self.window.display();
@@ -164,6 +165,19 @@ impl Editor {
             Some((font_grid_pos.y + font::NUM_ROWS_IGNORED) * font::NUM_COLS + font_grid_pos.x)
         } else {
             None
+        }
+    }
+
+    fn font_char_pos(&self, ch: i32) -> Option<Vector2i> {
+        if ch < font::NUM_CHARS_IGNORED {
+            None
+        } else {
+            let ch = ch - font::NUM_CHARS_IGNORED;
+            let char_x = ch % font::NUM_COLS;
+            let char_y = ch / font::NUM_COLS;
+            let x = char_x * self.font_size.x * self.font_scale + self.font_table_offset.x;
+            let y = char_y * self.font_size.y * self.font_scale + self.font_table_offset.y;
+            Some(Vector2i::new(x, y))
         }
     }
 
@@ -266,5 +280,34 @@ impl Editor {
             self.font_scale as f32,
         ));
         self.window.draw(&sprite);
+    }
+
+    fn draw_active_char_border(&mut self) {
+        self.draw_char_border(self.display_char, Color::rgb(0xC0, 0xC0, 0xC0));
+    }
+
+    fn draw_hover_char_border(&mut self) {
+        let mouse_pos = self.window.mouse_position();
+        if let Some(ch) = self.pick_char(mouse_pos.x, mouse_pos.y) {
+            let color = Color::rgb(0xC0, 0xC0, 0x80);
+            self.draw_char_border(ch, color);
+        }
+    }
+
+    fn draw_char_border(&mut self, ch: i32, color: Color) {
+        if let Some(pos) = self.font_char_pos(ch) {
+            let x = pos.x;
+            let y = pos.y;
+            let size_x = self.font_size.x * self.font_scale;
+            let size_y = self.font_size.y * self.font_scale;
+
+            let mut rect = sfml::graphics::RectangleShape::new();
+            rect.set_position((x as f32, y as f32));
+            rect.set_size((size_x as f32, size_y as f32));
+            rect.set_outline_thickness(2.0);
+            rect.set_outline_color(color);
+            rect.set_fill_color(Color::TRANSPARENT);
+            self.window.draw(&rect);
+        }
     }
 }

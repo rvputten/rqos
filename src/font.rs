@@ -117,13 +117,17 @@ impl Font {
     pub fn shift_char(&mut self, ch: i32, dx: i32, dy: i32) {
         let x = (ch % NUM_COLS) * self.char_size.x;
         let y = (ch / NUM_COLS) * self.char_size.y;
-        let source = IntRect::new(
+        let mut source = IntRect::new(
             x - dx,
             y - dy,
             self.char_size.x - dx.abs(),
             self.char_size.y - dy.abs(),
         );
-        let dest = Vector2u::new(x as u32, y as u32);
+        let mut dest = Vector2u::new(x as u32, y as u32);
+        if source.left < 0 {
+            dest.x += (-source.left) as u32;
+            source.left = 0;
+        }
         let copy = self.image.clone();
         unsafe {
             self.image.copy_image(&copy, dest.x, dest.y, source, false);
