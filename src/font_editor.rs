@@ -37,13 +37,15 @@ impl Editor {
         let edit_char_offset = Vector2i::new(font_width, font_height);
         let edit_char_size =
             Vector2i::new(font_size.x * edit_char_scale, font_size.y * edit_char_scale);
-        let sample_text_offset = Vector2i::new(
-            edit_char_size.x + edit_char_offset.x + font_width,
-            font_height,
-        );
         let font_table_offset = Vector2i::new(
             edit_char_offset.x,
             edit_char_offset.y + edit_char_size.y + font_height,
+        );
+        let edit_char_right = edit_char_offset.x + edit_char_size.x;
+        let font_table_right = font_table_offset.x + (font_width * font::NUM_COLS);
+        let sample_text_offset = Vector2i::new(
+            font_table_right.max(edit_char_right) + font_width,
+            font_height,
         );
         let font = if let Ok(font) = Font::load(font_name, font_size) {
             font
@@ -95,6 +97,10 @@ impl Editor {
     fn key_pressed(&mut self, code: Key) {
         match code {
             Key::Escape => self.window.close(),
+            Key::N => self.display_char = (self.display_char + 1) % font::NUM_CHARS,
+            Key::P => {
+                self.display_char = (self.display_char + font::NUM_CHARS - 1) % font::NUM_CHARS
+            }
             Key::C => self.copy_char(),
             Key::H => self.font.flip_char_horizontal(self.display_char),
             Key::V => self.font.flip_char_vertical(self.display_char),
@@ -240,22 +246,24 @@ impl Editor {
         draw_text(text, Color::WHITE);
         draw_text(&text.to_uppercase(), Color::rgb(0xc0, 0xc0, 0xff));
         draw_text(&text.to_lowercase(), Color::rgb(0xff, 0xc0, 0xc0));
-        let text2 = r#"
+
+        for line in (r#"
 Indeed, the quick brown fox - agile, bold, and cunning - jumped over
 the lazy dog; surprisingly, it didn't even break a sweat! However,
 the dog, perplexed, thought: 'Why on earth would it do that?' Then,
 the fox replied, "Why not?" and sent an email to its friend
 @foxmail.com, writing: 'Had a great day/night, outsmarted a dog
 again!'. The fox then looked at its reflection in the river, seeing
-a victorious smile [or was it a smirk?] in the mirror-like surface."#;
-        for line in text2.lines() {
+a victorious smile [or was it a smirk?] in the mirror-like surface."#)
+            .lines()
+        {
             draw_text(line, Color::rgb(0xc0, 0xff, 0xc0));
         }
 
         for line in (r#"
-Jack, the quick brown fox, exclaimed, 'I've outsmarted 10 dogs, earned
-$100, and I'm still #1 in the forest!' before he dashed off into the
-night."#)
+Jack, the quick brown fox, exclaimed, 'I've outsmarted 10 dogs,
+earned $100, and I'm still #1 in the forest!' before he dashed off
+into the night."#)
             .lines()
         {
             draw_text(line, Color::rgb(0xff, 0xc0, 0xff));
