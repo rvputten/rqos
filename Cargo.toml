@@ -9,5 +9,19 @@ repository = "https://github.com/rvputten/rqos.git"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = [
+    "font",
+    "font_editor",
+]
+
+[lib]
+name = "font"
+path = "font/src/lib.rs"
+
+[[bin]]
+name = "font_editor"
+path = "font_editor/src/main.rs"
+
 [dependencies]
 sfml = "0.21"

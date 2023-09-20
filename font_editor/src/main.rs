@@ -2,7 +2,6 @@ use sfml::graphics::RenderWindow;
 use sfml::system::Vector2i;
 use sfml::window::Style;
 
-mod font;
 mod font_editor;
 
 fn main() {

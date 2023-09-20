@@ -7,8 +7,7 @@ use sfml::window::mouse;
 use sfml::window::Event;
 use sfml::window::Key;
 
-use crate::font;
-use crate::font::Font;
+use font::Font;
 
 pub struct Editor {
     font_size: Vector2i,
