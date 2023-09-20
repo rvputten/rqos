@@ -5,6 +5,10 @@ set -o pipefail
 dirname=$(cd "$(dirname "$0")"; pwd -P)
 exe_name=`basename $dirname`
 
+################
+exe_name=rqsh
+################
+
 pid=`ps -eo pid,comm|grep -w "$exe_name"|awk '{print $1}'`
 [[ -n $pid ]] && { echo "Kill $pid"; kill $pid; }
 
@@ -32,7 +36,7 @@ echo "error_lines_count: $error_lines_count"
     xclip -i
 
 echo --------------------------------------------------------------------------------
-inotifywait -q -e close_write src Cargo.toml run.sh
+inotifywait -q -e close_write */src Cargo.toml */Cargo.toml
 clear
 
 exec ./run.sh
