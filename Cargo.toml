@@ -1,6 +1,6 @@
 [package]
 name = "rqos"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Raoul van Putten <53082972+rvputten@users.noreply.github.com>"]
 edition = "2021"
 description = "Operating system on top of the Linux kernel and sfml"
