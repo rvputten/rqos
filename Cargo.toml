@@ -1,7 +1,11 @@
 [package]
-name = "os"
+name = "rqos"
 version = "0.1.0"
+authors = ["Raoul van Putten <53082972+rvputten@users.noreply.github.com>"]
 edition = "2021"
+description = "Operating system on top of the Linux kernel and sfml"
+license = "MIT"
+repository = "https://github.com/rvputten/rqos.git"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
