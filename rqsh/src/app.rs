@@ -6,7 +6,9 @@ use sfml::window::{Event, Style};
 pub struct App {
     font: font::Font,
     font_scale: i32,
-    text: text::Text,
+    main_text: text::Text,
+    status_line: text::Text,
+    command: text::Text,
     window: RenderWindow,
 }
 
@@ -21,8 +23,15 @@ impl App {
         let font_scale = 2;
         let font = font::Font::load(font_name, font_size).expect("Failed to load font");
 
-        let window_width = font_scale * font_size.x * 120;
-        let window_height = font_scale * font_size.y * 80;
+        let rows = 80;
+        let cols = 120;
+
+        let row = |y: i32| -> i32 { y * font_size.y * font_scale };
+        let col = |x: i32| -> i32 { x * font_size.x * font_scale };
+        let p2t = |x: i32, y: i32| -> Vector2i { Vector2i::new(col(x), row(y)) };
+
+        let window_width = col(cols);
+        let window_height = row(rows);
         let (window_pos_x, window_pos_y) = (
             ((screen_width as i32) - (window_width / 2)),
             ((screen_height as i32 / 2) - (window_height / 2)),
@@ -37,14 +46,20 @@ impl App {
         window.set_position(Vector2i::new(window_pos_x, window_pos_y));
         window.set_vertical_sync_enabled(true);
 
-        let mut text = text::Text::new();
-        text.write("Hello, world!");
-        text.write("How's it going?");
+        let mut main_text = text::Text::new(p2t(0, 0), p2t(cols, rows - 2));
+        let mut status_line = text::Text::new(p2t(0, rows - 2), p2t(cols, 1));
+        let mut command = text::Text::new(p2t(0, rows - 1), p2t(cols, 1));
+
+        main_text.write("Hello,\nworld!");
+        status_line.write(" willem@zen:/home/willem/rust/rqos ");
+        command.write(": ");
 
         Self {
             font,
             font_scale,
-            text,
+            main_text,
+            status_line,
+            command,
             window,
         }
     }
@@ -60,7 +75,11 @@ impl App {
             }
 
             self.window.clear(Color::BLACK);
-            self.text
+            self.main_text
+                .draw(&mut self.window, &self.font, self.font_scale);
+            self.status_line
+                .draw(&mut self.window, &self.font, self.font_scale);
+            self.command
                 .draw(&mut self.window, &self.font, self.font_scale);
             self.window.display();
         }
