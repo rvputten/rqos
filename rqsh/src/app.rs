@@ -5,7 +5,6 @@ use sfml::window::{Event, Style};
 
 pub struct App {
     font: font::Font,
-    font_scale: i32,
     main_text: text::Text,
     status_line: text::Text,
     command: text::Text,
@@ -47,8 +46,14 @@ impl App {
         window.set_vertical_sync_enabled(true);
 
         let mut main_text = text::Text::new(p2t(0, 0), p2t(cols, rows - 2));
+        main_text.set_font_scale(font_scale);
         let mut status_line = text::Text::new(p2t(0, rows - 2), p2t(cols, 1));
+        status_line.set_font_scale(font_scale);
+        status_line.set_bg_color(Color::rgb(0xf0, 0xc7, 0x00));
+        status_line.set_fg_color(Color::BLACK);
+        status_line.set_bold(true);
         let mut command = text::Text::new(p2t(0, rows - 1), p2t(cols, 1));
+        command.set_font_scale(font_scale);
 
         main_text.write("Hello,\nworld!");
         status_line.write(" willem@zen:/home/willem/rust/rqos ");
@@ -56,7 +61,6 @@ impl App {
 
         Self {
             font,
-            font_scale,
             main_text,
             status_line,
             command,
@@ -75,12 +79,9 @@ impl App {
             }
 
             self.window.clear(Color::BLACK);
-            self.main_text
-                .draw(&mut self.window, &self.font, self.font_scale);
-            self.status_line
-                .draw(&mut self.window, &self.font, self.font_scale);
-            self.command
-                .draw(&mut self.window, &self.font, self.font_scale);
+            self.main_text.draw(&mut self.window, &self.font);
+            self.status_line.draw(&mut self.window, &self.font);
+            self.command.draw(&mut self.window, &self.font);
             self.window.display();
         }
     }

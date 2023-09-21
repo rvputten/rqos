@@ -36,7 +36,7 @@ echo "error_lines_count: $error_lines_count"
     xclip -i
 
 echo --------------------------------------------------------------------------------
-inotifywait -q -e close_write */src Cargo.toml */Cargo.toml
+inotifywait -q -e close_write */src Cargo.toml */Cargo.toml resources/*
 clear
 
 exec ./run.sh
