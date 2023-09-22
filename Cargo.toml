@@ -14,6 +14,7 @@ default-run = "rqsh"
 members = [
     "font",
     "text",
+    "edit",
     "font_editor",
     "rqsh",
 ]
@@ -30,3 +31,4 @@ path = "font_editor/src/main.rs"
 sfml = "0.21"
 font = { path = "font" }
 text = { path = "text" }
+edit = { path = "edit" }

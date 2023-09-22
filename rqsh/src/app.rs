@@ -8,7 +8,7 @@ pub struct App<'a> {
     font_scale: i32,
     main_text: text::Text<'a>,
     status_line: text::Text<'a>,
-    command: text::Text<'a>,
+    command: edit::Edit<'a>,
     window: RenderWindow,
 }
 
@@ -59,14 +59,13 @@ impl App<'_> {
             true,
             text::CursorState::Hidden,
         );
-        let mut command = text::Text::new(
+        let mut command = edit::Edit::new(
             Vector2i::new(0, window_height - font_height),
             Vector2i::new(window_width, font_height),
             font_scale,
             Color::WHITE,
             Color::BLACK,
             false,
-            text::CursorState::Active,
         );
 
         main_text.write("Hello,\n");
@@ -99,6 +98,7 @@ impl App<'_> {
                 match event {
                     Event::Closed => self.window.close(),
                     Event::KeyPressed { code, .. } => self.key_pressed(code),
+                    Event::KeyReleased { code, .. } => self.command.key_released(code),
                     Event::Resized { width, height } => {
                         self.resize_event(width as i32, height as i32)
                     }
@@ -140,10 +140,10 @@ impl App<'_> {
     }
 
     fn key_pressed(&mut self, code: Key) {
-        #[allow(clippy::single_match)]
-        match code {
-            Key::Escape => self.window.close(),
-            _ => {}
+        if code == Key::Escape {
+            self.window.close();
+        } else {
+            self.command.key_pressed(code);
         }
     }
 }
