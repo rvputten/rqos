@@ -58,10 +58,6 @@ impl Font {
         })
     }
 
-    pub fn texture_size(&self) -> Vector2u {
-        self.texture.size()
-    }
-
     pub fn get_sprite(&self, ch: i32) -> Sprite {
         if !(0..NUM_CHARS).contains(&ch) {
             panic!("Invalid character: {}", ch);

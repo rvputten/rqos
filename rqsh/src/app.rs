@@ -3,16 +3,16 @@ use sfml::system::Vector2i;
 use sfml::window::Key;
 use sfml::window::{Event, Style};
 
-pub struct App {
+pub struct App<'a> {
     font: font::Font,
     font_scale: i32,
-    main_text: text::Text,
-    status_line: text::Text,
-    command: text::Text,
+    main_text: text::Text<'a>,
+    status_line: text::Text<'a>,
+    command: text::Text<'a>,
     window: RenderWindow,
 }
 
-impl App {
+impl App<'_> {
     pub fn new() -> Self {
         let desktop_mode = sfml::window::VideoMode::desktop_mode();
         let screen_width = desktop_mode.width;
@@ -89,7 +89,6 @@ impl App {
 
     pub fn run(&mut self) {
         while self.window.is_open() {
-            let frame_start_time = std::time::Instant::now();
             while let Some(event) = self.window.poll_event() {
                 match event {
                     Event::Closed => self.window.close(),
@@ -106,15 +105,6 @@ impl App {
             self.status_line.draw(&mut self.window, &self.font);
             self.command.draw(&mut self.window, &self.font);
             self.window.display();
-
-            let frame_end_time = std::time::Instant::now();
-            let frame_duration = frame_end_time - frame_start_time;
-            print!("\rduration: {:?}    ", frame_duration);
-            let frame_time_target = 33;
-            if frame_duration.as_millis() < frame_time_target {
-                let time_to_sleep = (frame_time_target - frame_duration.as_millis()) as u64;
-                std::thread::sleep(std::time::Duration::from_millis(time_to_sleep));
-            }
         }
     }
 

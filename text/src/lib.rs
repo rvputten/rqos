@@ -6,7 +6,7 @@ use sfml::system::{Vector2f, Vector2i};
 
 //use font;
 
-pub struct Text {
+pub struct Text<'a> {
     text: Vec<String>,
     position: Vector2i,
     texture: RenderTexture,
@@ -15,9 +15,10 @@ pub struct Text {
     bg_color: Color,
     bold: bool,
     redraw: bool,
+    shader: Shader<'a>,
 }
 
-impl Text {
+impl<'a> Text<'a> {
     pub fn new(
         position: Vector2i,
         size: Vector2i,
@@ -26,6 +27,13 @@ impl Text {
         bg_color: Color,
         bold: bool,
     ) -> Self {
+        let shader_file = if bold {
+            "resources/color_bold.frag"
+        } else {
+            "resources/color.frag"
+        };
+        let shader = Shader::from_file(shader_file, ShaderType::Fragment).unwrap();
+
         Self {
             text: vec![String::new()],
             position,
@@ -35,6 +43,7 @@ impl Text {
             bg_color,
             bold,
             redraw: true,
+            shader,
         }
     }
 
@@ -63,32 +72,28 @@ impl Text {
     }
 
     pub fn draw(&mut self, window: &mut RenderWindow, font: &font::Font) {
-        let shader_file = if self.bold {
-            "resources/color_bold.frag"
-        } else {
-            "resources/color.frag"
-        };
-        let mut shader = Shader::from_file(shader_file, ShaderType::Fragment).unwrap();
-        shader.set_uniform_vec4("bg_color", glsl::Vec4::from(self.bg_color));
-        shader.set_uniform_vec4("fg_color", glsl::Vec4::from(self.fg_color));
-        if self.bold {
-            let texture_size = font.texture_size();
-            shader.set_uniform_vec2(
-                "texture_size",
-                glsl::Vec2::new(texture_size.x as f32, texture_size.y as f32),
-            );
-        }
-
-        let mut states = RenderStates::default();
-        states.set_shader(Some(&shader));
-
-        let col = |x: i32| -> f32 { (x * font.char_size.x * self.font_scale) as f32 };
-        let row = |y: i32| -> f32 { (y * font.char_size.y * self.font_scale) as f32 };
-        let pos = |x: i32, y: i32| -> Vector2f { Vector2f::new(col(x), row(y)) };
-
-        let mut x = 0;
-
         if self.redraw {
+            self.shader
+                .set_uniform_vec4("bg_color", glsl::Vec4::from(self.bg_color));
+            self.shader
+                .set_uniform_vec4("fg_color", glsl::Vec4::from(self.fg_color));
+            if self.bold {
+                let font_texture_size = font.texture.size();
+                self.shader.set_uniform_vec2(
+                    "texture_size",
+                    glsl::Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
+                );
+            }
+
+            let mut states = RenderStates::default();
+            states.set_shader(Some(&self.shader));
+
+            let col = |x: i32| -> f32 { (x * font.char_size.x * self.font_scale) as f32 };
+            let row = |y: i32| -> f32 { (y * font.char_size.y * self.font_scale) as f32 };
+            let pos = |x: i32, y: i32| -> Vector2f { Vector2f::new(col(x), row(y)) };
+
+            let mut x = 0;
+
             self.texture.clear(self.bg_color);
             for (y, line) in self.text.iter().enumerate() {
                 for ch in line.chars() {
