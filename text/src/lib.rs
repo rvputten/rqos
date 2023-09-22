@@ -25,17 +25,17 @@ impl Display for CursorState {
 }
 
 pub struct Text<'a> {
-    text: Vec<String>,
+    pub text: Vec<String>,
     position: Vector2i,
     texture: RenderTexture,
     font_scale: i32,
     fg_color: Color,
     bg_color: Color,
     bold: bool,
-    redraw: bool,
+    pub redraw: bool,
     shader: Shader<'a>,
-    cursor_state: CursorState,
-    cursor_position: Vector2i,
+    pub cursor_state: CursorState,
+    pub cursor_position: Vector2i,
 }
 
 impl<'a> Text<'a> {

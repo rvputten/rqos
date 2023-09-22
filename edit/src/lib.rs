@@ -78,6 +78,7 @@ impl Edit<'_> {
             match code {
                 Key::LShift | Key::RShift => self.shift_pressed(true),
                 Key::LControl | Key::RControl => self.control_pressed(true),
+                Key::Backspace => self.backspace(),
                 _ => {}
             }
         }
@@ -88,6 +89,23 @@ impl Edit<'_> {
             Key::LShift | Key::RShift => self.shift_pressed(false),
             Key::LControl | Key::RControl => self.control_pressed(false),
             _ => {}
+        }
+    }
+
+    fn backspace(&mut self) {
+        self.text.redraw = true;
+        let text = &mut self.text.text;
+        let cursor_position = &mut self.text.cursor_position;
+        if cursor_position.x > 0 {
+            let line = &mut text[cursor_position.y as usize];
+            let idx = cursor_position.x as usize;
+            line.remove(idx - 1);
+            cursor_position.x -= 1;
+        } else if cursor_position.y > 0 {
+            let line = text.remove(cursor_position.y as usize);
+            cursor_position.y -= 1;
+            cursor_position.x = text[cursor_position.y as usize].len() as i32;
+            text[cursor_position.y as usize] += &line;
         }
     }
 
