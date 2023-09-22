@@ -10,10 +10,10 @@ fn main() {
     let screen_height = desktop_mode.height;
 
     let font_name = "font";
-    let font_size = Vector2i::new(10, 20);
+    let font_size = Vector2i::new(20, 40);
     let edit_char_scale: i32 = 40;
-    let font_scale = 3;
-    let sample_text_scale = 2;
+    let font_scale = 2;
+    let sample_text_scale = 1;
 
     let window_width = edit_char_scale * font_size.x + 80 * font_size.x * sample_text_scale;
     let window_height = edit_char_scale * font_size.y
