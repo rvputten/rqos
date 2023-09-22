@@ -11,27 +11,35 @@ pub struct Text {
     position: Vector2i,
     texture: RenderTexture,
     font_scale: i32,
-    bg_color: Color,
     fg_color: Color,
+    bg_color: Color,
     bold: bool,
 }
 
 impl Text {
-    pub fn new(position: Vector2i, size: Vector2i) -> Self {
+    pub fn new(
+        position: Vector2i,
+        size: Vector2i,
+        font_scale: i32,
+        fg_color: Color,
+        bg_color: Color,
+        bold: bool,
+    ) -> Self {
         let texture = RenderTexture::new(size.x as u32, size.y as u32).unwrap();
-        let font_scale = 1;
-        let bg_color = Color::rgb(0x00, 0x00, 0x00);
-        let fg_color = Color::rgb(0xff, 0xff, 0xff);
-        let bold = false;
         Self {
-            text: Vec::new(),
+            text: vec![String::new()],
             position,
             texture,
             font_scale,
-            bg_color,
             fg_color,
+            bg_color,
             bold,
         }
+    }
+
+    pub fn set_position_size(&mut self, position: Vector2i, size: Vector2i) {
+        self.position = position;
+        self.texture = RenderTexture::new(size.x as u32, size.y as u32).unwrap();
     }
 
     pub fn set_font_scale(&mut self, font_scale: i32) {
@@ -51,7 +59,11 @@ impl Text {
     }
 
     pub fn write(&mut self, text: &str) {
-        let mut line = String::new();
+        let mut line = if self.text.is_empty() {
+            String::new()
+        } else {
+            self.text.pop().unwrap()
+        };
         for c in text.chars() {
             if c == '\n' {
                 self.text.push(line);

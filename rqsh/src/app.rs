@@ -5,6 +5,7 @@ use sfml::window::{Event, Style};
 
 pub struct App {
     font: font::Font,
+    font_scale: i32,
     main_text: text::Text,
     status_line: text::Text,
     command: text::Text,
@@ -22,15 +23,10 @@ impl App {
         let font_scale = 2;
         let font = font::Font::load(font_name, font_size).expect("Failed to load font");
 
-        let rows = 80;
-        let cols = 120;
-
-        let row = |y: i32| -> i32 { y * font_size.y * font_scale };
-        let col = |x: i32| -> i32 { x * font_size.x * font_scale };
-        let p2t = |x: i32, y: i32| -> Vector2i { Vector2i::new(col(x), row(y)) };
-
-        let window_width = col(cols);
-        let window_height = row(rows);
+        let font_height = font_size.y * font_scale;
+        let (cols, rows) = (120, 80);
+        let window_width = cols * font_size.x * font_scale;
+        let window_height = rows * font_height;
         let (window_pos_x, window_pos_y) = (
             ((screen_width as i32) - (window_width / 2)),
             ((screen_height as i32 / 2) - (window_height / 2)),
@@ -39,28 +35,51 @@ impl App {
         let mut window = RenderWindow::new(
             (window_width as u32, window_height as u32),
             "rqsh",
-            Style::CLOSE,
+            Style::CLOSE | Style::RESIZE,
             &Default::default(),
         );
         window.set_position(Vector2i::new(window_pos_x, window_pos_y));
         window.set_vertical_sync_enabled(true);
 
-        let mut main_text = text::Text::new(p2t(0, 0), p2t(cols, rows - 2));
-        main_text.set_font_scale(font_scale);
-        let mut status_line = text::Text::new(p2t(0, rows - 2), p2t(cols, 1));
-        status_line.set_font_scale(font_scale);
-        status_line.set_bg_color(Color::rgb(0xf0, 0xc7, 0x00));
-        status_line.set_fg_color(Color::BLACK);
-        status_line.set_bold(true);
-        let mut command = text::Text::new(p2t(0, rows - 1), p2t(cols, 1));
-        command.set_font_scale(font_scale);
+        let mut main_text = text::Text::new(
+            Vector2i::new(0, 0),
+            Vector2i::new(window_width, window_height - font_height * 2),
+            font_scale,
+            Color::BLACK,
+            Color::WHITE,
+            false,
+        );
+        let mut status_line = text::Text::new(
+            Vector2i::new(0, window_height - font_height * 2),
+            Vector2i::new(window_width, font_height),
+            font_scale,
+            Color::BLACK,
+            Color::rgb(0xf0, 0xc7, 0x00),
+            true,
+        );
+        let mut command = text::Text::new(
+            Vector2i::new(0, window_height - font_height),
+            Vector2i::new(window_width, font_height),
+            font_scale,
+            Color::WHITE,
+            Color::BLACK,
+            false,
+        );
 
-        main_text.write("Hello,\nworld!");
+        main_text.write("Hello, ");
+        main_text.write("world!\n");
+        for y in 1..rows {
+            for x in (0..cols).step_by(5) {
+                main_text.write(&format!(" {:4}", 100 * y + x));
+            }
+            main_text.write("\n");
+        }
         status_line.write(" willem@zen:/home/willem/rust/rqos ");
         command.write(": ");
 
         Self {
             font,
+            font_scale,
             main_text,
             status_line,
             command,
@@ -70,10 +89,14 @@ impl App {
 
     pub fn run(&mut self) {
         while self.window.is_open() {
+            let frame_start_time = std::time::Instant::now();
             while let Some(event) = self.window.poll_event() {
                 match event {
                     Event::Closed => self.window.close(),
                     Event::KeyPressed { code, .. } => self.key_pressed(code),
+                    Event::Resized { width, height } => {
+                        self.resize_event(width as i32, height as i32)
+                    }
                     _ => {}
                 }
             }
@@ -83,10 +106,45 @@ impl App {
             self.status_line.draw(&mut self.window, &self.font);
             self.command.draw(&mut self.window, &self.font);
             self.window.display();
+
+            let frame_end_time = std::time::Instant::now();
+            let frame_duration = frame_end_time - frame_start_time;
+            print!("\rduration: {:?}    ", frame_duration);
+            let frame_time_target = 33;
+            if frame_duration.as_millis() < frame_time_target {
+                let time_to_sleep = (frame_time_target - frame_duration.as_millis()) as u64;
+                std::thread::sleep(std::time::Duration::from_millis(time_to_sleep));
+            }
         }
     }
 
+    fn resize_event(&mut self, width: i32, height: i32) {
+        self.window.set_view(&sfml::graphics::View::new(
+            sfml::system::Vector2f::new(width as f32 / 2.0, height as f32 / 2.0),
+            sfml::system::Vector2f::new(width as f32, height as f32),
+        ));
+        self.set_window_sizes(width, height);
+    }
+
+    fn set_window_sizes(&mut self, width: i32, height: i32) {
+        let font_height = self.font.char_size.y * self.font_scale;
+
+        self.main_text.set_position_size(
+            Vector2i::new(0, 0),
+            Vector2i::new(width, height - font_height * 2),
+        );
+        self.status_line.set_position_size(
+            Vector2i::new(0, height - font_height * 2),
+            Vector2i::new(width, font_height),
+        );
+        self.command.set_position_size(
+            Vector2i::new(0, height - font_height),
+            Vector2i::new(width, font_height),
+        );
+    }
+
     fn key_pressed(&mut self, code: Key) {
+        #[allow(clippy::single_match)]
         match code {
             Key::Escape => self.window.close(),
             _ => {}
