@@ -88,26 +88,38 @@ impl<'a> Text<'a> {
             let mut states = RenderStates::default();
             states.set_shader(Some(&self.shader));
 
-            let col = |x: i32| -> f32 { (x * font.char_size.x * self.font_scale) as f32 };
-            let row = |y: i32| -> f32 { (y * font.char_size.y * self.font_scale) as f32 };
-            let pos = |x: i32, y: i32| -> Vector2f { Vector2f::new(col(x), row(y)) };
-
-            let mut x = 0;
-
+            let font_height = font.char_size.y * self.font_scale;
+            let font_width = font.char_size.x * self.font_scale;
+            let fully_visible_lines = self.texture.size().y as i32 / font_height;
+            let partially_visible_lines =
+                (self.texture.size().y as i32 + font_height - 1) / font_height;
+            let text_len = self.text.len() as i32;
+            let fully_shown_lines = fully_visible_lines.min(text_len);
+            let partially_shown_lines = partially_visible_lines.min(text_len);
+            let partially_skipped_lines = text_len - partially_shown_lines;
+            let fully_skipped_lines = text_len - fully_shown_lines;
+            let start_y = if fully_skipped_lines > 0 {
+                self.texture.size().y as i32 - partially_shown_lines * font_height
+            } else {
+                0
+            };
             self.texture.clear(self.bg_color);
-            for (y, line) in self.text.iter().enumerate() {
-                for ch in line.chars() {
+            for (y, line) in self.text[partially_skipped_lines as usize..]
+                .iter()
+                .enumerate()
+            {
+                for (x, ch) in line.chars().enumerate() {
                     let mut sprite = font.get_sprite(ch as i32);
-                    sprite.set_position(pos(x, y as i32));
+                    sprite.set_position(Vector2f::new(
+                        (x as i32 * font_width) as f32,
+                        (start_y + y as i32 * font_height) as f32,
+                    ));
                     sprite.set_scale(Vector2f::new(
                         self.font_scale as f32,
                         self.font_scale as f32,
                     ));
-                    //self.texture.draw(&sprite);
                     self.texture.draw_with_renderstates(&sprite, &states);
-                    x += 1;
                 }
-                x = 0;
             }
             self.redraw = false;
         }

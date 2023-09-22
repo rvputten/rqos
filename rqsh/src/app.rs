@@ -66,13 +66,16 @@ impl App<'_> {
             false,
         );
 
-        main_text.write("Hello, ");
+        main_text.write("Hello,\n");
         main_text.write("world!\n");
-        for y in 1..rows {
+        let rows_to_show = rows - 4;
+        for y in 1..=rows_to_show {
             for x in (0..cols).step_by(5) {
                 main_text.write(&format!(" {:4}", 100 * y + x));
             }
-            main_text.write("\n");
+            if y != rows_to_show {
+                main_text.write("\n");
+            }
         }
         status_line.write(" willem@zen:/home/willem/rust/rqos ");
         command.write(": ");
