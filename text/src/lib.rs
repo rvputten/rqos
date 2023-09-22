@@ -1,10 +1,28 @@
+use std::fmt;
+use std::fmt::{Display, Formatter};
+
 use sfml::graphics::{
     glsl, Color, RenderStates, RenderTarget, RenderTexture, RenderWindow, Shader, ShaderType,
     Sprite, Transformable,
 };
 use sfml::system::{Vector2f, Vector2i};
 
-//use font;
+#[derive(Debug, PartialEq)]
+pub enum CursorState {
+    Hidden,
+    Active,
+    Inactive,
+}
+
+impl Display for CursorState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            CursorState::Hidden => write!(f, "Hidden"),
+            CursorState::Active => write!(f, "Active"),
+            CursorState::Inactive => write!(f, "Inactive"),
+        }
+    }
+}
 
 pub struct Text<'a> {
     text: Vec<String>,
@@ -16,6 +34,8 @@ pub struct Text<'a> {
     bold: bool,
     redraw: bool,
     shader: Shader<'a>,
+    cursor_state: CursorState,
+    cursor_position: Vector2i,
 }
 
 impl<'a> Text<'a> {
@@ -26,6 +46,7 @@ impl<'a> Text<'a> {
         fg_color: Color,
         bg_color: Color,
         bold: bool,
+        cursor_state: CursorState,
     ) -> Self {
         let shader_file = if bold {
             "resources/color_bold.frag"
@@ -44,6 +65,8 @@ impl<'a> Text<'a> {
             bold,
             redraw: true,
             shader,
+            cursor_state,
+            cursor_position: Vector2i::new(0, 0),
         }
     }
 
@@ -63,31 +86,33 @@ impl<'a> Text<'a> {
             if c == '\n' {
                 self.text.push(line);
                 line = String::new();
+                self.cursor_position.x = 0;
+                self.cursor_position.y += 1;
             } else {
                 line.push(c);
+                self.cursor_position.x += 1;
             }
         }
         self.text.push(line);
         self.redraw = true;
     }
 
+    fn set_shader_parameters(&mut self, font: &font::Font, fg_color: Color, bg_color: Color) {
+        self.shader
+            .set_uniform_vec4("fg_color", glsl::Vec4::from(fg_color));
+        self.shader
+            .set_uniform_vec4("bg_color", glsl::Vec4::from(bg_color));
+        if self.bold {
+            let font_texture_size = font.texture.size();
+            self.shader.set_uniform_vec2(
+                "texture_size",
+                glsl::Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
+            );
+        }
+    }
+
     pub fn draw(&mut self, window: &mut RenderWindow, font: &font::Font) {
         if self.redraw {
-            self.shader
-                .set_uniform_vec4("bg_color", glsl::Vec4::from(self.bg_color));
-            self.shader
-                .set_uniform_vec4("fg_color", glsl::Vec4::from(self.fg_color));
-            if self.bold {
-                let font_texture_size = font.texture.size();
-                self.shader.set_uniform_vec2(
-                    "texture_size",
-                    glsl::Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
-                );
-            }
-
-            let mut states = RenderStates::default();
-            states.set_shader(Some(&self.shader));
-
             let font_height = font.char_size.y * self.font_scale;
             let font_width = font.char_size.x * self.font_scale;
             let fully_visible_lines = self.texture.size().y as i32 / font_height;
@@ -103,25 +128,57 @@ impl<'a> Text<'a> {
             } else {
                 0
             };
-            self.texture.clear(self.bg_color);
-            for (y, line) in self.text[partially_skipped_lines as usize..]
-                .iter()
-                .enumerate()
+
+            // draw everything except the cursor
             {
-                for (x, ch) in line.chars().enumerate() {
-                    let mut sprite = font.get_sprite(ch as i32);
-                    sprite.set_position(Vector2f::new(
-                        (x as i32 * font_width) as f32,
-                        (start_y + y as i32 * font_height) as f32,
-                    ));
-                    sprite.set_scale(Vector2f::new(
-                        self.font_scale as f32,
-                        self.font_scale as f32,
-                    ));
-                    self.texture.draw_with_renderstates(&sprite, &states);
+                self.set_shader_parameters(font, self.fg_color, self.bg_color);
+                let mut states_fg_bg = RenderStates::default();
+                states_fg_bg.set_shader(Some(&self.shader));
+                self.texture.clear(self.bg_color);
+                for (y, line) in self.text[partially_skipped_lines as usize..]
+                    .iter()
+                    .enumerate()
+                {
+                    for (x, ch) in line.chars().enumerate() {
+                        let mut sprite = font.get_sprite(ch as i32);
+                        sprite.set_position(Vector2f::new(
+                            (x as i32 * font_width) as f32,
+                            (start_y + y as i32 * font_height) as f32,
+                        ));
+                        sprite.set_scale(Vector2f::new(
+                            self.font_scale as f32,
+                            self.font_scale as f32,
+                        ));
+                        self.texture.draw_with_renderstates(&sprite, &states_fg_bg);
+                    }
                 }
+                self.redraw = false;
+                println!(
+                    "cursor: ({}/{}), state={}",
+                    self.cursor_position.x, self.cursor_position.y, self.cursor_state
+                );
             }
-            self.redraw = false;
+
+            if self.cursor_state != CursorState::Hidden {
+                self.set_shader_parameters(font, self.bg_color, self.fg_color);
+                let mut states_bg_fg = RenderStates::default();
+                states_bg_fg.set_shader(Some(&self.shader));
+
+                let ch = self.text[self.cursor_position.y as usize]
+                    .chars()
+                    .nth(self.cursor_position.x as usize)
+                    .unwrap_or(' ');
+                let mut sprite = font.get_sprite(ch as i32);
+                sprite.set_position(Vector2f::new(
+                    (self.cursor_position.x * font_width) as f32,
+                    (start_y + self.cursor_position.y * font_height) as f32,
+                ));
+                sprite.set_scale(Vector2f::new(
+                    self.font_scale as f32,
+                    self.font_scale as f32,
+                ));
+                self.texture.draw_with_renderstates(&sprite, &states_bg_fg);
+            }
         }
         self.texture.display();
 

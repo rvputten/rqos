@@ -48,6 +48,7 @@ impl App<'_> {
             Color::BLACK,
             Color::WHITE,
             false,
+            text::CursorState::Hidden,
         );
         let mut status_line = text::Text::new(
             Vector2i::new(0, window_height - font_height * 2),
@@ -56,6 +57,7 @@ impl App<'_> {
             Color::BLACK,
             Color::rgb(0xf0, 0xc7, 0x00),
             true,
+            text::CursorState::Hidden,
         );
         let mut command = text::Text::new(
             Vector2i::new(0, window_height - font_height),
@@ -64,6 +66,7 @@ impl App<'_> {
             Color::WHITE,
             Color::BLACK,
             false,
+            text::CursorState::Active,
         );
 
         main_text.write("Hello,\n");
