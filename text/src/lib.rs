@@ -14,6 +14,7 @@ pub struct Text {
     fg_color: Color,
     bg_color: Color,
     bold: bool,
+    redraw: bool,
 }
 
 impl Text {
@@ -25,37 +26,22 @@ impl Text {
         bg_color: Color,
         bold: bool,
     ) -> Self {
-        let texture = RenderTexture::new(size.x as u32, size.y as u32).unwrap();
         Self {
             text: vec![String::new()],
             position,
-            texture,
+            texture: RenderTexture::new(size.x as u32, size.y as u32).unwrap(),
             font_scale,
             fg_color,
             bg_color,
             bold,
+            redraw: true,
         }
     }
 
     pub fn set_position_size(&mut self, position: Vector2i, size: Vector2i) {
         self.position = position;
         self.texture = RenderTexture::new(size.x as u32, size.y as u32).unwrap();
-    }
-
-    pub fn set_font_scale(&mut self, font_scale: i32) {
-        self.font_scale = font_scale;
-    }
-
-    pub fn set_bg_color(&mut self, bg_color: Color) {
-        self.bg_color = bg_color;
-    }
-
-    pub fn set_fg_color(&mut self, fg_color: Color) {
-        self.fg_color = fg_color;
-    }
-
-    pub fn set_bold(&mut self, bold: bool) {
-        self.bold = bold;
+        self.redraw = true;
     }
 
     pub fn write(&mut self, text: &str) {
@@ -73,6 +59,7 @@ impl Text {
             }
         }
         self.text.push(line);
+        self.redraw = true;
     }
 
     pub fn draw(&mut self, window: &mut RenderWindow, font: &font::Font) {
@@ -101,20 +88,23 @@ impl Text {
 
         let mut x = 0;
 
-        self.texture.clear(self.bg_color);
-        for (y, line) in self.text.iter().enumerate() {
-            for ch in line.chars() {
-                let mut sprite = font.get_sprite(ch as i32);
-                sprite.set_position(pos(x, y as i32));
-                sprite.set_scale(Vector2f::new(
-                    self.font_scale as f32,
-                    self.font_scale as f32,
-                ));
-                //self.texture.draw(&sprite);
-                self.texture.draw_with_renderstates(&sprite, &states);
-                x += 1;
+        if self.redraw {
+            self.texture.clear(self.bg_color);
+            for (y, line) in self.text.iter().enumerate() {
+                for ch in line.chars() {
+                    let mut sprite = font.get_sprite(ch as i32);
+                    sprite.set_position(pos(x, y as i32));
+                    sprite.set_scale(Vector2f::new(
+                        self.font_scale as f32,
+                        self.font_scale as f32,
+                    ));
+                    //self.texture.draw(&sprite);
+                    self.texture.draw_with_renderstates(&sprite, &states);
+                    x += 1;
+                }
+                x = 0;
             }
-            x = 0;
+            self.redraw = false;
         }
         self.texture.display();
 
