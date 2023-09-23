@@ -57,8 +57,8 @@ impl App<'_> {
             ),
             text::VerticalAlignment::AlwaysBottom,
             font_scale,
+            Color::rgb(0xad, 0xd8, 0xe6),
             Color::BLACK,
-            Color::WHITE,
             false,
             text::CursorState::Hidden,
         );
@@ -68,9 +68,9 @@ impl App<'_> {
             Vector2i::new(dir_window_width, window_height - font_height * 2),
             text::VerticalAlignment::AlwaysBottom,
             font_scale,
+            Color::rgb(0xad, 0xd8, 0xe6),
             Color::BLACK,
-            Color::WHITE,
-            false,
+            true,
             text::CursorState::Hidden,
         );
 

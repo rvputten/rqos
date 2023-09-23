@@ -162,6 +162,24 @@ impl<'a> Text<'a> {
                 0
             };
 
+            let (partially_skipped_lines, start_y) = match self.vertical_alignment {
+                VerticalAlignment::AlwaysTop => (0, 0),
+                VerticalAlignment::AlwaysBottom => {
+                    if text_len * font_height > self.texture.size().y as i32 {
+                        (partially_skipped_lines, start_y)
+                    } else {
+                        (0, self.texture.size().y as i32 - text_len * font_height)
+                    }
+                }
+                VerticalAlignment::BottomOnOverflow => {
+                    if partially_skipped_lines > 0 {
+                        (partially_skipped_lines, start_y)
+                    } else {
+                        (0, 0)
+                    }
+                }
+            };
+
             // draw everything except the cursor
             {
                 self.set_shader_parameters(font, self.fg_color, self.bg_color);
