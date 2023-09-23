@@ -1,5 +1,6 @@
 // rqsh
 mod app;
+mod builtin;
 
 use app::App;
 

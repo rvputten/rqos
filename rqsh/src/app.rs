@@ -3,6 +3,8 @@ use sfml::system::Vector2i;
 use sfml::window::Key;
 use sfml::window::{Event, Style};
 
+use crate::builtin::BuiltIn;
+
 pub struct App<'a> {
     font: font::Font,
     font_scale: i32,
@@ -150,12 +152,26 @@ impl App<'_> {
         let command = self.command.replace(vec![]);
         // system execute
         let args = command[0].split_whitespace().collect::<Vec<_>>();
-        let output = std::process::Command::new(args[0])
+        let (ret, output) = if let Some((ret, output)) = BuiltIn::run(&args) {
+            (ret, output)
+        } else if let Ok(result) = std::process::Command::new(&args[0])
             .args(&args[1..])
             .output()
-            .expect("failed to execute process");
-        let output = String::from_utf8_lossy(&output.stdout);
-        self.main_text.clear();
+        {
+            let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
+            let stderr = String::from_utf8_lossy(&result.stderr).into_owned();
+            let lines: Vec<String> = stdout
+                .lines()
+                .chain(stderr.lines())
+                .map(|s| s.to_string())
+                .collect();
+            (result.status.code().unwrap_or(1), lines)
+        } else {
+            (1, vec!["Command failed to execute".to_string()])
+        };
+        let output = output.join("\n");
+        self.main_text
+            .write(&format!("\n`{}` returned {}\n", command[0], ret));
         self.main_text.write(&output);
     }
 }
