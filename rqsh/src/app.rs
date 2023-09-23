@@ -23,7 +23,7 @@ impl App<'_> {
         let screen_width = desktop_mode.width;
         let screen_height = desktop_mode.height;
 
-        let font_name = "font";
+        let font_name = "font_bold";
         let font_size = Vector2i::new(20, 40);
         let font_scale = 1;
         let font = font::Font::load(font_name, font_size).expect("Failed to load font");
@@ -70,7 +70,7 @@ impl App<'_> {
             font_scale,
             Color::rgb(0xad, 0xd8, 0xe6),
             Color::BLACK,
-            true,
+            false,
             text::CursorState::Hidden,
         );
 
@@ -81,7 +81,7 @@ impl App<'_> {
             font_scale,
             Color::BLACK,
             Color::rgb(0xf0, 0xc7, 0x00),
-            true,
+            false,
             text::CursorState::Hidden,
         );
 

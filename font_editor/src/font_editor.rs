@@ -103,6 +103,7 @@ impl Editor {
             Key::C => self.copy_char(),
             Key::H => self.font.flip_char_horizontal(self.display_char),
             Key::V => self.font.flip_char_vertical(self.display_char),
+            Key::B => self.font.make_all_bold(),
             Key::Left => self.font.shift_char(self.display_char, -1, 0),
             Key::Right => self.font.shift_char(self.display_char, 1, 0),
             Key::Up => self.font.shift_char(self.display_char, 0, -1),

@@ -114,6 +114,58 @@ impl Font {
         }
     }
 
+    pub fn make_all_bold(&mut self) {
+        for ch in 0..NUM_CHARS {
+            self.make_bold(ch);
+        }
+    }
+
+    pub fn make_bold(&mut self, ch: i32) {
+        let x = (ch % NUM_COLS) * self.char_size.x;
+        let y = (ch / NUM_COLS) * self.char_size.y;
+        let width = self.char_size.x;
+        let height = self.char_size.y;
+
+        let copy = self.image.clone();
+        unsafe {
+            for j in 0..height {
+                for i in 0..(width - 1) {
+                    let i = width - 1 - 1 - i;
+                    let source_x = x + i + 1;
+                    let source_y = y + j;
+                    let dest_x = x + i;
+                    let dest_y = y + j;
+                    if (source_x < 0)
+                        || (source_x >= self.image.size().x as i32)
+                        || (source_y < 0)
+                        || (source_y >= self.image.size().y as i32)
+                    {
+                        println!(
+                            "Invalid source: ch={}, x={}, y={}, i={}, j={}",
+                            ch, x, y, i, j
+                        );
+                    }
+                    if (dest_x < 0)
+                        || (dest_x >= self.image.size().x as i32)
+                        || (dest_y < 0)
+                        || (dest_y >= self.image.size().y as i32)
+                    {
+                        println!("Invalid dest: {}, {}", dest_x, dest_y);
+                    }
+                    let color = copy.pixel_at((x + i + 1) as u32, (y + j) as u32);
+                    if color.r > 0 {
+                        self.image.set_pixel(
+                            (x + i) as u32,
+                            (y + j) as u32,
+                            Color::rgb(color.r, color.g, color.b),
+                        );
+                    }
+                }
+            }
+            self.texture.update_from_image(&self.image, 0, 0);
+        }
+    }
+
     pub fn flip_char_horizontal(&mut self, ch: i32) {
         let x = (ch % NUM_COLS) * self.char_size.x;
         let y = (ch / NUM_COLS) * self.char_size.y;

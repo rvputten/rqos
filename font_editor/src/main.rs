@@ -9,7 +9,7 @@ fn main() {
     let screen_width = desktop_mode.width;
     let screen_height = desktop_mode.height;
 
-    let font_name = "font";
+    let font_name = "font_bold";
     let font_size = Vector2i::new(20, 40);
     let edit_char_scale: i32 = 40;
     let font_scale = 2;

@@ -19,6 +19,7 @@ if [[ "$?" -eq 0 ]]; then
     cargo test && {
 	echo --------------------------------------------------------------------------------
 	rg --color=always '#\[allow\((dead_code|unused_variables)\)\]'
+	#unbuffer cargo run -p font_editor &
 	unbuffer cargo run &
     }
 else
