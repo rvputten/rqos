@@ -46,6 +46,10 @@ impl Edit<'_> {
         self.text.write(text);
     }
 
+    pub fn replace(&mut self, text: Vec<String>) -> Vec<String> {
+        self.text.replace(text)
+    }
+
     pub fn draw(&mut self, window: &mut RenderWindow, font: &font::Font) {
         self.text.draw(window, font);
     }

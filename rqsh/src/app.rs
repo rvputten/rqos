@@ -47,7 +47,7 @@ impl App<'_> {
             font_scale,
             Color::BLACK,
             Color::WHITE,
-            false,
+            true,
             text::CursorState::Hidden,
         );
         let mut status_line = text::Text::new(
@@ -59,7 +59,7 @@ impl App<'_> {
             true,
             text::CursorState::Hidden,
         );
-        let mut command = edit::Edit::new(
+        let command = edit::Edit::new(
             Vector2i::new(0, window_height - font_height),
             Vector2i::new(window_width, font_height),
             font_scale,
@@ -79,8 +79,7 @@ impl App<'_> {
                 main_text.write("\n");
             }
         }
-        status_line.write(" willem@zen:/home/willem/rust/rqos ");
-        command.write(": ");
+        status_line.write("willem@zen:/home/willem/rust/rqos ");
 
         Self {
             font,
@@ -140,10 +139,23 @@ impl App<'_> {
     }
 
     fn key_pressed(&mut self, code: Key) {
-        if code == Key::Escape {
-            self.window.close();
-        } else {
-            self.command.key_pressed(code);
+        match code {
+            Key::Escape => self.window.close(),
+            Key::Enter => self.run_command(),
+            _ => self.command.key_pressed(code),
         }
+    }
+
+    fn run_command(&mut self) {
+        let command = self.command.replace(vec![]);
+        // system execute
+        let args = command[0].split_whitespace().collect::<Vec<_>>();
+        let output = std::process::Command::new(args[0])
+            .args(&args[1..])
+            .output()
+            .expect("failed to execute process");
+        let output = String::from_utf8_lossy(&output.stdout);
+        self.main_text.clear();
+        self.main_text.write(&output);
     }
 }

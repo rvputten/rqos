@@ -97,6 +97,23 @@ impl<'a> Text<'a> {
         self.redraw = true;
     }
 
+    pub fn clear(&mut self) {
+        self.text = vec![String::new()];
+        self.cursor_position = Vector2i::new(0, 0);
+        self.redraw = true;
+    }
+
+    pub fn replace(&mut self, text: Vec<String>) -> Vec<String> {
+        let old_text = std::mem::replace(&mut self.text, text);
+        if self.text.is_empty() {
+            self.text.push(String::new());
+        }
+        self.cursor_position.y = self.text.len() as i32 - 1;
+        self.cursor_position.x = self.text[self.cursor_position.y as usize].len() as i32;
+        self.redraw = true;
+        old_text
+    }
+
     fn set_shader_parameters(&mut self, font: &font::Font, fg_color: Color, bg_color: Color) {
         self.shader
             .set_uniform_vec4("fg_color", glsl::Vec4::from(fg_color));
@@ -153,10 +170,6 @@ impl<'a> Text<'a> {
                     }
                 }
                 self.redraw = false;
-                println!(
-                    "cursor: ({}/{}), state={}",
-                    self.cursor_position.x, self.cursor_position.y, self.cursor_state
-                );
             }
 
             if self.cursor_state != CursorState::Hidden {
