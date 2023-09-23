@@ -43,6 +43,7 @@ pub struct Text<'a> {
     shader: Shader<'a>,
     pub cursor_state: CursorState,
     pub cursor_position: Vector2i,
+    pub scroll_pos_y: i32,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -77,6 +78,7 @@ impl<'a> Text<'a> {
             shader,
             cursor_state,
             cursor_position: Vector2i::new(0, 0),
+            scroll_pos_y: 0,
         }
     }
 
@@ -146,14 +148,24 @@ impl<'a> Text<'a> {
 
     pub fn draw(&mut self, window: &mut RenderWindow, font: &font::Font) {
         if self.redraw {
+            let text = if self.scroll_pos_y < 0 {
+                let m = (-self.scroll_pos_y) as usize;
+                let m = self.text.len() - m;
+                self.text[..m].to_vec()
+            } else {
+                self.text.clone()
+            };
             let font_height = font.char_size.y * self.font_scale;
             let font_width = font.char_size.x * self.font_scale;
+
             let fully_visible_lines = self.texture.size().y as i32 / font_height;
             let partially_visible_lines =
                 (self.texture.size().y as i32 + font_height - 1) / font_height;
-            let text_len = self.text.len() as i32;
+
+            let text_len = text.len() as i32;
             let fully_shown_lines = fully_visible_lines.min(text_len);
             let partially_shown_lines = partially_visible_lines.min(text_len);
+
             let partially_skipped_lines = text_len - partially_shown_lines;
             let fully_skipped_lines = text_len - fully_shown_lines;
             let start_y = if fully_skipped_lines > 0 {
@@ -180,16 +192,12 @@ impl<'a> Text<'a> {
                 }
             };
 
-            // draw everything except the cursor
             {
                 self.set_shader_parameters(font, self.fg_color, self.bg_color);
                 let mut states_fg_bg = RenderStates::default();
                 states_fg_bg.set_shader(Some(&self.shader));
                 self.texture.clear(self.bg_color);
-                for (y, line) in self.text[partially_skipped_lines as usize..]
-                    .iter()
-                    .enumerate()
-                {
+                for (y, line) in text[partially_skipped_lines as usize..].iter().enumerate() {
                     for (x, ch) in line.chars().enumerate() {
                         let mut sprite = font.get_sprite(ch as i32);
                         sprite.set_position(Vector2f::new(
@@ -211,7 +219,7 @@ impl<'a> Text<'a> {
                 let mut states_bg_fg = RenderStates::default();
                 states_bg_fg.set_shader(Some(&self.shader));
 
-                let ch = self.text[self.cursor_position.y as usize]
+                let ch = text[self.cursor_position.y as usize]
                     .chars()
                     .nth(self.cursor_position.x as usize)
                     .unwrap_or(' ');

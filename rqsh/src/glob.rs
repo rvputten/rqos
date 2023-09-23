@@ -3,13 +3,6 @@ pub struct Glob {
 }
 
 impl Glob {
-    #[allow(dead_code)]
-    pub fn new(source: &[&str]) -> Self {
-        Self {
-            source: source.iter().map(|s| s.to_string()).collect(),
-        }
-    }
-
     pub fn from_vec_string(source: Vec<String>) -> Self {
         Self { source }
     }
@@ -85,7 +78,11 @@ mod tests {
 
     #[test]
     fn test_glob() {
-        let glob = Glob::new(&["abc", "abcd", "abcde"]);
+        let strings = vec!["abc", "abcd", "abcde"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let glob = Glob::from_vec_string(strings);
         let empty: Vec<&str> = Vec::new();
         assert_eq!(glob.glob("abc"), vec!["abc"]);
         assert_eq!(glob.glob("abc*"), vec!["abc", "abcd", "abcde"]);

@@ -173,8 +173,33 @@ impl App<'_> {
         match code {
             Key::Escape => self.window.close(),
             Key::Enter => self.run_command(),
+            Key::Up => self.scroll(-1),
+            Key::Down => self.scroll(1),
+            Key::PageUp => self.scroll(-2),
+            Key::PageDown => self.scroll(2),
             _ => self.command.key_pressed(code),
         }
+    }
+
+    fn scroll(&mut self, direction: i32) {
+        let font_height = self.font.char_size.y * self.font_scale;
+        let window_height = self.window.size().y as i32;
+        let main_window_line_count = (window_height - font_height * 2) / font_height;
+        let scroll_amount = if direction.abs() == 1 {
+            1
+        } else {
+            main_window_line_count - 1
+        };
+        self.main_text.scroll_pos_y += direction.signum() * scroll_amount;
+        let text_line_count = self.main_text.text.len() as i32;
+
+        if self.main_text.scroll_pos_y > 0 || text_line_count <= main_window_line_count {
+            self.main_text.scroll_pos_y = 0;
+        } else if -self.main_text.scroll_pos_y > text_line_count - main_window_line_count {
+            self.main_text.scroll_pos_y = -text_line_count + main_window_line_count;
+        }
+
+        self.main_text.redraw = true;
     }
 
     fn update_pwd_directory(&mut self) {
@@ -204,6 +229,7 @@ impl App<'_> {
     }
 
     fn run_command(&mut self) {
+        self.main_text.scroll_pos_y = 0;
         let command = self.command.replace(vec![]);
         // system execute
         let args = command[0].split_whitespace().collect::<Vec<_>>();
