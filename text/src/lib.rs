@@ -109,6 +109,10 @@ impl<'a> Text<'a> {
         self.redraw = true;
     }
 
+    pub fn get_text(&self) -> Vec<String> {
+        self.text.clone()
+    }
+
     pub fn clear(&mut self) {
         self.text = vec![String::new()];
         self.cursor_position = Vector2i::new(0, 0);

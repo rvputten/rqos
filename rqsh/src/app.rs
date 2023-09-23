@@ -4,6 +4,7 @@ use sfml::window::Key;
 use sfml::window::{Event, Style};
 
 use crate::builtin::BuiltIn;
+use crate::glob::Glob;
 
 pub struct App<'a> {
     font: font::Font,
@@ -13,6 +14,7 @@ pub struct App<'a> {
     status_line: text::Text<'a>,
     command: edit::Edit<'a>,
     window: RenderWindow,
+    dir_plain: Vec<String>,
 }
 
 impl App<'_> {
@@ -101,6 +103,7 @@ impl App<'_> {
             status_line,
             command,
             window,
+            dir_plain: Vec::new(),
         };
 
         app.update_pwd_directory();
@@ -178,31 +181,52 @@ impl App<'_> {
         let pwd = std::env::current_dir().unwrap();
         self.status_line.replace(vec![format!("{}", pwd.display())]);
 
-        let mut contents = String::new();
+        let mut dir_adorned = String::new();
+        let mut dir_plain = String::new();
         for entry in pwd.read_dir().unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
-            let name = path.file_name().unwrap().to_str().unwrap();
+            let file_name = path.file_name().unwrap().to_str().unwrap();
             if path.is_dir() {
-                contents.push_str(&format!("{}/\n", name));
+                dir_adorned.push_str(&format!("{}/\n", file_name));
             } else {
-                contents.push_str(&format!("{}\n", name));
+                dir_adorned.push_str(&format!("{}\n", file_name));
             }
+            dir_plain.push_str(&format!("{}\n", file_name));
         }
-        // sort
-        let mut contents: Vec<String> = contents.lines().map(|s| s.to_string()).collect();
-        contents.sort();
-        self.directory.replace(contents);
+        self.dir_plain = dir_plain.lines().map(|s| s.to_string()).collect();
+        self.dir_plain.sort();
+
+        let mut dir_adorned: Vec<String> = dir_adorned.lines().map(|s| s.to_string()).collect();
+        dir_adorned.sort();
+
+        self.directory.replace(dir_adorned);
     }
 
     fn run_command(&mut self) {
         let command = self.command.replace(vec![]);
         // system execute
         let args = command[0].split_whitespace().collect::<Vec<_>>();
-        let (ret, output) = if let Some((ret, output)) = BuiltIn::run(&args) {
+        let glob = Glob::from_vec_string(self.dir_plain.clone());
+        let mut expanded = glob.glob(args[0]);
+        if expanded.is_empty() {
+            expanded.push(args[0].to_string());
+        }
+        if args.len() > 1 {
+            for arg in args[1..].iter() {
+                let g = glob.glob(arg);
+                if g.is_empty() {
+                    expanded.push(arg.to_string());
+                } else {
+                    expanded.extend(g);
+                }
+            }
+        }
+        let expanded_str: Vec<&str> = expanded.iter().map(AsRef::as_ref).collect();
+        let (ret, output) = if let Some((ret, output)) = BuiltIn::run(&expanded_str) {
             (ret, output)
-        } else if let Ok(result) = std::process::Command::new(args[0])
-            .args(&args[1..])
+        } else if let Ok(result) = std::process::Command::new(expanded_str[0])
+            .args(&expanded_str[1..])
             .output()
         {
             let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
@@ -217,8 +241,11 @@ impl App<'_> {
             (1, vec!["Command failed to execute".to_string()])
         };
         let output = output.join("\n");
-        self.main_text
-            .write(&format!("\n`{}` returned {}\n", command[0], ret));
+        self.main_text.write(&format!(
+            "\n`{}` returned {}\n",
+            expanded_str.join(" "),
+            ret
+        ));
         self.main_text.write(&output);
 
         self.update_pwd_directory();

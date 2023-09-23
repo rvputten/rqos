@@ -1,13 +1,17 @@
-#![allow(dead_code)]
-struct Glob {
+pub struct Glob {
     source: Vec<String>,
 }
 
 impl Glob {
+    #[allow(dead_code)]
     pub fn new(source: &[&str]) -> Self {
         Self {
             source: source.iter().map(|s| s.to_string()).collect(),
         }
+    }
+
+    pub fn from_vec_string(source: Vec<String>) -> Self {
+        Self { source }
     }
 
     fn matches(pattern: &str, to_match: &str) -> bool {
@@ -25,7 +29,7 @@ impl Glob {
                         return true;
                     }
                     let remaining_pattern: String = pattern_chars.collect();
-                    while let Some(_) = to_match_chars.peek() {
+                    while to_match_chars.peek().is_some() {
                         let remaining_to_match: String = to_match_chars.clone().collect();
                         if Self::matches(&remaining_pattern, &remaining_to_match) {
                             return true;
