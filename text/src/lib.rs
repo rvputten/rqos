@@ -24,9 +24,16 @@ impl Display for CursorState {
     }
 }
 
+pub enum VerticalAlignment {
+    AlwaysTop,
+    AlwaysBottom,
+    BottomOnOverflow,
+}
+
 pub struct Text<'a> {
     pub text: Vec<String>,
     position: Vector2i,
+    pub vertical_alignment: VerticalAlignment,
     texture: RenderTexture,
     font_scale: i32,
     fg_color: Color,
@@ -38,10 +45,12 @@ pub struct Text<'a> {
     pub cursor_position: Vector2i,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl<'a> Text<'a> {
     pub fn new(
         position: Vector2i,
         size: Vector2i,
+        vertical_alignment: VerticalAlignment,
         font_scale: i32,
         fg_color: Color,
         bg_color: Color,
@@ -58,6 +67,7 @@ impl<'a> Text<'a> {
         Self {
             text: vec![String::new()],
             position,
+            vertical_alignment,
             texture: RenderTexture::new(size.x as u32, size.y as u32).unwrap(),
             font_scale,
             fg_color,
@@ -71,8 +81,10 @@ impl<'a> Text<'a> {
     }
 
     pub fn set_position_size(&mut self, position: Vector2i, size: Vector2i) {
+        let size_x = if size.x < 1 { 1 } else { size.x };
+        let size_y = if size.y < 1 { 1 } else { size.y };
         self.position = position;
-        self.texture = RenderTexture::new(size.x as u32, size.y as u32).unwrap();
+        self.texture = RenderTexture::new(size_x as u32, size_y as u32).unwrap();
         self.redraw = true;
     }
 

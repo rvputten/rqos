@@ -21,6 +21,7 @@ impl Edit<'_> {
     pub fn new(
         position: Vector2i,
         size: Vector2i,
+        vertical_alignment: text::VerticalAlignment,
         font_scale: i32,
         fg_color: Color,
         bg_color: Color,
@@ -31,6 +32,7 @@ impl Edit<'_> {
             text: Text::new(
                 position,
                 size,
+                vertical_alignment,
                 font_scale,
                 fg_color,
                 bg_color,

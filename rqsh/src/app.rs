@@ -9,6 +9,7 @@ pub struct App<'a> {
     font: font::Font,
     font_scale: i32,
     main_text: text::Text<'a>,
+    directory: text::Text<'a>,
     status_line: text::Text<'a>,
     command: edit::Edit<'a>,
     window: RenderWindow,
@@ -25,8 +26,11 @@ impl App<'_> {
         let font_scale = 1;
         let font = font::Font::load(font_name, font_size).expect("Failed to load font");
 
+        let font_width = font_size.x * font_scale;
         let font_height = font_size.y * font_scale;
-        let (cols, rows) = (120, 80);
+        let dir_window_cols = 40;
+        let dir_window_width = dir_window_cols * font_width;
+        let (cols, rows) = (120 + dir_window_cols, 80);
         let window_width = cols * font_size.x * font_scale;
         let window_height = rows * font_height;
         let (window_pos_x, window_pos_y) = (
@@ -43,54 +47,64 @@ impl App<'_> {
         window.set_position(Vector2i::new(window_pos_x, window_pos_y));
         window.set_vertical_sync_enabled(true);
 
-        let mut main_text = text::Text::new(
+        let main_text = text::Text::new(
             Vector2i::new(0, 0),
-            Vector2i::new(window_width, window_height - font_height * 2),
+            Vector2i::new(
+                window_width - dir_window_width,
+                window_height - font_height * 2,
+            ),
+            text::VerticalAlignment::AlwaysBottom,
             font_scale,
             Color::BLACK,
             Color::WHITE,
-            true,
+            false,
             text::CursorState::Hidden,
         );
-        let mut status_line = text::Text::new(
+
+        let directory = text::Text::new(
+            Vector2i::new(window_width - dir_window_width, 0),
+            Vector2i::new(dir_window_width, window_height - font_height * 2),
+            text::VerticalAlignment::AlwaysBottom,
+            font_scale,
+            Color::BLACK,
+            Color::WHITE,
+            false,
+            text::CursorState::Hidden,
+        );
+
+        let status_line = text::Text::new(
             Vector2i::new(0, window_height - font_height * 2),
             Vector2i::new(window_width, font_height),
+            text::VerticalAlignment::AlwaysTop,
             font_scale,
             Color::BLACK,
             Color::rgb(0xf0, 0xc7, 0x00),
             true,
             text::CursorState::Hidden,
         );
+
         let command = edit::Edit::new(
             Vector2i::new(0, window_height - font_height),
             Vector2i::new(window_width, font_height),
+            text::VerticalAlignment::AlwaysTop,
             font_scale,
-            Color::WHITE,
             Color::BLACK,
+            Color::WHITE,
             false,
         );
 
-        main_text.write("Hello,\n");
-        main_text.write("world!\n");
-        let rows_to_show = rows - 4;
-        for y in 1..=rows_to_show {
-            for x in (0..cols).step_by(5) {
-                main_text.write(&format!(" {:4}", 100 * y + x));
-            }
-            if y != rows_to_show {
-                main_text.write("\n");
-            }
-        }
-        status_line.write("willem@zen:/home/willem/rust/rqos ");
-
-        Self {
+        let mut app = Self {
             font,
             font_scale,
             main_text,
+            directory,
             status_line,
             command,
             window,
-        }
+        };
+
+        app.update_pwd_directory();
+        app
     }
 
     pub fn run(&mut self) {
@@ -109,6 +123,7 @@ impl App<'_> {
 
             self.window.clear(Color::BLACK);
             self.main_text.draw(&mut self.window, &self.font);
+            self.directory.draw(&mut self.window, &self.font);
             self.status_line.draw(&mut self.window, &self.font);
             self.command.draw(&mut self.window, &self.font);
             self.window.display();
@@ -124,11 +139,22 @@ impl App<'_> {
     }
 
     fn set_window_sizes(&mut self, width: i32, height: i32) {
+        let font_width = self.font.char_size.x * self.font_scale;
         let font_height = self.font.char_size.y * self.font_scale;
+
+        let dir_window_width = if width < 40 * font_width {
+            2 * font_width
+        } else {
+            40 * font_width
+        };
 
         self.main_text.set_position_size(
             Vector2i::new(0, 0),
-            Vector2i::new(width, height - font_height * 2),
+            Vector2i::new(width - dir_window_width, height - font_height * 2),
+        );
+        self.directory.set_position_size(
+            Vector2i::new(width - dir_window_width, 0),
+            Vector2i::new(dir_window_width, height - font_height * 2),
         );
         self.status_line.set_position_size(
             Vector2i::new(0, height - font_height * 2),
@@ -148,13 +174,34 @@ impl App<'_> {
         }
     }
 
+    fn update_pwd_directory(&mut self) {
+        let pwd = std::env::current_dir().unwrap();
+        self.status_line.replace(vec![format!("{}", pwd.display())]);
+
+        let mut contents = String::new();
+        for entry in pwd.read_dir().unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            let name = path.file_name().unwrap().to_str().unwrap();
+            if path.is_dir() {
+                contents.push_str(&format!("{}/\n", name));
+            } else {
+                contents.push_str(&format!("{}\n", name));
+            }
+        }
+        // sort
+        let mut contents: Vec<String> = contents.lines().map(|s| s.to_string()).collect();
+        contents.sort();
+        self.directory.replace(contents);
+    }
+
     fn run_command(&mut self) {
         let command = self.command.replace(vec![]);
         // system execute
         let args = command[0].split_whitespace().collect::<Vec<_>>();
         let (ret, output) = if let Some((ret, output)) = BuiltIn::run(&args) {
             (ret, output)
-        } else if let Ok(result) = std::process::Command::new(&args[0])
+        } else if let Ok(result) = std::process::Command::new(args[0])
             .args(&args[1..])
             .output()
         {
@@ -173,5 +220,7 @@ impl App<'_> {
         self.main_text
             .write(&format!("\n`{}` returned {}\n", command[0], ret));
         self.main_text.write(&output);
+
+        self.update_pwd_directory();
     }
 }
