@@ -70,6 +70,12 @@ impl Edit<'_> {
         if ucode >= start_abc && ucode <= end_abc {
             if self.shift {
                 self.write(&KEYMAP_SHIFT[ucode..ucode + 1]);
+            } else if self.control {
+                match code {
+                    Key::H => self.backspace(),
+                    Key::U => self.text.clear(),
+                    _ => {}
+                }
             } else {
                 self.write(&KEYMAP_NOSHIFT[ucode..ucode + 1]);
             }

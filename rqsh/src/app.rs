@@ -1,10 +1,18 @@
 use sfml::graphics::{Color, RenderTarget, RenderWindow};
 use sfml::system::Vector2i;
-use sfml::window::Key;
-use sfml::window::{Event, Style};
+use sfml::window::{Event, Key, Style};
 
 use crate::builtin::BuiltIn;
 use crate::glob::Glob;
+
+enum ScrollType {
+    CursorUp,
+    CursorDown,
+    PageUp,
+    PageDown,
+    MouseWheelUp,
+    MouseWheelDown,
+}
 
 pub struct App<'a> {
     font: font::Font,
@@ -94,8 +102,8 @@ impl App<'_> {
             Vector2i::new(window_width, font_height),
             text::VerticalAlignment::AlwaysTop,
             font_scale,
-            Color::BLACK,
             Color::WHITE,
+            Color::BLACK,
             false,
         );
 
@@ -121,6 +129,13 @@ impl App<'_> {
                     Event::Closed => self.window.close(),
                     Event::KeyPressed { code, .. } => self.key_pressed(code),
                     Event::KeyReleased { code, .. } => self.command.key_released(code),
+                    Event::MouseWheelScrolled { delta, .. } => {
+                        if delta > 0.0 {
+                            self.scroll(ScrollType::MouseWheelUp);
+                        } else {
+                            self.scroll(ScrollType::MouseWheelDown);
+                        }
+                    }
                     Event::Resized { width, height } => {
                         self.resize_event(width as i32, height as i32)
                     }
@@ -177,24 +192,28 @@ impl App<'_> {
         match code {
             Key::Escape => self.window.close(),
             Key::Enter => self.run_command(),
-            Key::Up => self.scroll(-1),
-            Key::Down => self.scroll(1),
-            Key::PageUp => self.scroll(-2),
-            Key::PageDown => self.scroll(2),
+            Key::Up => self.scroll(ScrollType::CursorUp),
+            Key::Down => self.scroll(ScrollType::CursorDown),
+            Key::PageUp => self.scroll(ScrollType::PageUp),
+            Key::PageDown => self.scroll(ScrollType::PageDown),
             _ => self.command.key_pressed(code),
         }
     }
 
-    fn scroll(&mut self, direction: i32) {
+    fn scroll(&mut self, scroll_type: ScrollType) {
         let font_height = self.font.char_size.y * self.font_scale;
         let window_height = self.window.size().y as i32;
         let main_window_line_count = (window_height - font_height * 2) / font_height;
-        let scroll_amount = if direction.abs() == 1 {
-            1
-        } else {
-            main_window_line_count - 1
+        let scroll_amount = match scroll_type {
+            ScrollType::CursorUp => -1,
+            ScrollType::CursorDown => 1,
+            ScrollType::PageUp => -main_window_line_count + 1,
+            ScrollType::PageDown => main_window_line_count - 1,
+            ScrollType::MouseWheelUp => -4,
+            ScrollType::MouseWheelDown => 4,
         };
-        self.main_text.scroll_pos_y += direction.signum() * scroll_amount;
+
+        self.main_text.scroll_pos_y += scroll_amount;
         let text_line_count = self.main_text.text.len() as i32;
 
         if self.main_text.scroll_pos_y > 0 || text_line_count <= main_window_line_count {
@@ -272,10 +291,17 @@ impl App<'_> {
                 (1, vec!["Command failed to execute".to_string()])
             };
             let output = output.join("\n");
+            let colors = color::AnsiColor::new();
+            let red = format!("\x1b[{}m", colors.get_ansi("Red").unwrap());
+            let _black = format!("\x1b[{}m", colors.get_ansi("Black").unwrap());
+            let reset = "\x1b[0m";
+
             self.main_text.write(&format!(
-                "\n`{}` returned {}\n",
+                "\n{}`{}` returned {}{}\n",
+                red,
                 expanded_str.join(" "),
-                ret
+                ret,
+                reset,
             ));
             self.main_text.write(&output);
 

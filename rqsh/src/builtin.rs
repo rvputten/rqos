@@ -62,6 +62,10 @@ impl BuiltIn {
                     }
                 }
             }
+            "yes" => {
+                let output = vec!["yes".to_string()];
+                Some((0, output))
+            }
             _ => None,
         }
     }
