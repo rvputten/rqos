@@ -29,13 +29,17 @@
 
 use sfml::graphics::Color;
 
-#[allow(dead_code)]
-enum ColorType {
-    Regular,
-    HighIntensity,
+#[derive(PartialEq, Debug)]
+pub enum ColorType {
+    Regular(usize),
+    Background(usize),
+    HighIntensity(usize),
+    BackgroundHighIntensity(usize),
+    Reset,
+    Bold,
 }
 
-#[allow(dead_code)]
+#[derive(Clone, Copy)]
 enum ColorStarts {
     Regular = 30,
     Background = 40,
@@ -142,6 +146,10 @@ impl AnsiColor {
         }
     }
 
+    pub fn get_color_from_ansi(&self, code: usize) -> Color {
+        self.all_colors[code]
+    }
+
     pub fn get_ansi(&self, name: &str) -> Option<usize> {
         if let Some(color) = self
             .regular_color_names
@@ -169,6 +177,53 @@ impl AnsiColor {
 
     pub fn get_color_background(&self, name: &str) -> Option<Color> {
         self.get_ansi_background(name).map(|x| self.all_colors[x])
+    }
+
+    pub fn parse_ansi_color_code(&self, text: &str) -> (usize, Option<ColorType>) {
+        if text.starts_with("\x1b[0m") {
+            return (4, Some(ColorType::Reset));
+        } else if text.starts_with("\x1b[m") {
+            return (3, Some(ColorType::Reset));
+        } else if text.starts_with("\x1b[1m") {
+            return (4, Some(ColorType::Bold));
+        } else if !text.starts_with("\x1b[") {
+            return (0, None);
+        }
+        let text = &text[2..];
+        let digits = text
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect::<String>();
+        let code = if let Ok(code) = digits.parse::<usize>() {
+            code
+        } else {
+            return (0, None);
+        };
+
+        let len = digits.len();
+        if len == 0 || !(30..=107).contains(&code) {
+            return (0, None);
+        }
+        let match_code = |x: ColorStarts| code >= x as usize && code <= x as usize + 7;
+        let text = &text[len..];
+        if text.is_empty() || !text.starts_with('m') {
+            eprintln!("Invalid ANSI color code: {}", text);
+            return (0, None);
+        }
+
+        let color = match code {
+            _ if match_code(ColorStarts::Regular) => Some(ColorType::Regular(code)),
+            _ if match_code(ColorStarts::Background) => Some(ColorType::Background(code)),
+            _ if match_code(ColorStarts::HighIntensity) => Some(ColorType::HighIntensity(code)),
+            _ if match_code(ColorStarts::BackgroundHighIntensity) => {
+                Some(ColorType::BackgroundHighIntensity(code))
+            }
+            _ => {
+                eprintln!("Unrecognized ANSI color code: {}", code);
+                None
+            }
+        };
+        (2 + len + 1, color)
     }
 }
 
@@ -262,6 +317,33 @@ mod tests {
         assert_eq!(
             color.get_color_background("Light Red"),
             Some(Color::rgb(0xFF, 0x45, 0x00))
+        );
+    }
+
+    #[test]
+    fn test_parse_ansi_color_code() {
+        let color = AnsiColor::new();
+
+        assert_eq!(
+            color.parse_ansi_color_code("\x1b[0m"),
+            (4, Some(ColorType::Reset))
+        );
+        assert_eq!(
+            color.parse_ansi_color_code("\x1b[30m"),
+            (5, Some(ColorType::Regular(30)))
+        );
+        assert_eq!(color.parse_ansi_color_code("\x1b[38m"), (5, None));
+        assert_eq!(
+            color.parse_ansi_color_code("\x1b[90m"),
+            (5, Some(ColorType::HighIntensity(90)))
+        );
+        assert_eq!(
+            color.parse_ansi_color_code("\x1b[40m"),
+            (5, Some(ColorType::Background(40)))
+        );
+        assert_eq!(
+            color.parse_ansi_color_code("\x1b[100m"),
+            (6, Some(ColorType::BackgroundHighIntensity(100)))
         );
     }
 }

@@ -10,3 +10,5 @@ To do
     - record positions in scroll buffer for every command
 - tab completion
 - completion of files not in the local directory
+- Ctrl-H
+- Ctrl-U

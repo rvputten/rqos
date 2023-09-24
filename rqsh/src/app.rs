@@ -235,49 +235,51 @@ impl App<'_> {
     fn run_command(&mut self) {
         self.main_text.scroll_pos_y = 0;
         let command = self.command.replace(vec![]);
-        // system execute
-        let args = command[0].split_whitespace().collect::<Vec<_>>();
-        let glob = Glob::from_vec_string(self.dir_plain.clone());
-        let mut expanded = glob.glob(args[0]);
-        if expanded.is_empty() {
-            expanded.push(args[0].to_string());
-        }
-        if args.len() > 1 {
-            for arg in args[1..].iter() {
-                let g = glob.glob(arg);
-                if g.is_empty() {
-                    expanded.push(arg.to_string());
-                } else {
-                    expanded.extend(g);
+        if !command.is_empty() && !command[0].is_empty() {
+            // system execute
+            let args = command[0].split_whitespace().collect::<Vec<_>>();
+            let glob = Glob::from_vec_string(self.dir_plain.clone());
+            let mut expanded = glob.glob(args[0]);
+            if expanded.is_empty() {
+                expanded.push(args[0].to_string());
+            }
+            if args.len() > 1 {
+                for arg in args[1..].iter() {
+                    let g = glob.glob(arg);
+                    if g.is_empty() {
+                        expanded.push(arg.to_string());
+                    } else {
+                        expanded.extend(g);
+                    }
                 }
             }
-        }
-        let expanded_str: Vec<&str> = expanded.iter().map(AsRef::as_ref).collect();
-        let (ret, output) = if let Some((ret, output)) = BuiltIn::run(&expanded_str) {
-            (ret, output)
-        } else if let Ok(result) = std::process::Command::new(expanded_str[0])
-            .args(&expanded_str[1..])
-            .output()
-        {
-            let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
-            let stderr = String::from_utf8_lossy(&result.stderr).into_owned();
-            let lines: Vec<String> = stdout
-                .lines()
-                .chain(stderr.lines())
-                .map(|s| s.to_string())
-                .collect();
-            (result.status.code().unwrap_or(1), lines)
-        } else {
-            (1, vec!["Command failed to execute".to_string()])
-        };
-        let output = output.join("\n");
-        self.main_text.write(&format!(
-            "\n`{}` returned {}\n",
-            expanded_str.join(" "),
-            ret
-        ));
-        self.main_text.write(&output);
+            let expanded_str: Vec<&str> = expanded.iter().map(AsRef::as_ref).collect();
+            let (ret, output) = if let Some((ret, output)) = BuiltIn::run(&expanded_str) {
+                (ret, output)
+            } else if let Ok(result) = std::process::Command::new(expanded_str[0])
+                .args(&expanded_str[1..])
+                .output()
+            {
+                let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
+                let stderr = String::from_utf8_lossy(&result.stderr).into_owned();
+                let lines: Vec<String> = stdout
+                    .lines()
+                    .chain(stderr.lines())
+                    .map(|s| s.to_string())
+                    .collect();
+                (result.status.code().unwrap_or(1), lines)
+            } else {
+                (1, vec!["Command failed to execute".to_string()])
+            };
+            let output = output.join("\n");
+            self.main_text.write(&format!(
+                "\n`{}` returned {}\n",
+                expanded_str.join(" "),
+                ret
+            ));
+            self.main_text.write(&output);
 
-        self.update_pwd_directory();
+            self.update_pwd_directory();
+        }
     }
 }

@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 sfml = "0.21"
 font = { path = "../font" }
+color = { path = "../color" }

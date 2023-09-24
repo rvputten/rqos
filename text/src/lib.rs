@@ -7,6 +7,8 @@ use sfml::graphics::{
 };
 use sfml::system::{Vector2f, Vector2i};
 
+use color::ColorType;
+
 #[derive(Debug, PartialEq)]
 pub enum CursorState {
     Hidden,
@@ -132,14 +134,18 @@ impl<'a> Text<'a> {
         old_text
     }
 
-    fn set_shader_parameters(&mut self, font: &font::Font, fg_color: Color, bg_color: Color) {
-        self.shader
-            .set_uniform_vec4("fg_color", glsl::Vec4::from(fg_color));
-        self.shader
-            .set_uniform_vec4("bg_color", glsl::Vec4::from(bg_color));
-        if self.bold {
+    fn set_shader_parameters(
+        shader: &mut Shader,
+        font: &font::Font,
+        fg_color: Color,
+        bg_color: Color,
+        bold: bool,
+    ) {
+        shader.set_uniform_vec4("fg_color", glsl::Vec4::from(fg_color));
+        shader.set_uniform_vec4("bg_color", glsl::Vec4::from(bg_color));
+        if bold {
             let font_texture_size = font.texture.size();
-            self.shader.set_uniform_vec2(
+            shader.set_uniform_vec2(
                 "texture_size",
                 glsl::Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
             );
@@ -199,25 +205,76 @@ impl<'a> Text<'a> {
         partially_skipped_lines: i32,
         start_y: i32,
     ) {
+        let ansi_colors = color::AnsiColor::new();
         let font_width = font.char_size.x * self.font_scale;
         let font_height = font.char_size.y * self.font_scale;
 
-        self.set_shader_parameters(font, self.fg_color, self.bg_color);
-        let mut states_fg_bg = RenderStates::default();
-        states_fg_bg.set_shader(Some(&self.shader));
+        let mut fg = self.fg_color;
+        let mut bg = self.bg_color;
+
+        Text::set_shader_parameters(
+            &mut self.shader,
+            font,
+            self.fg_color,
+            self.bg_color,
+            self.bold,
+        );
         self.texture.clear(self.bg_color);
         for (y, line) in text[partially_skipped_lines as usize..].iter().enumerate() {
+            let mut skip_chars = 0;
+            let mut skipped_chars = 0;
             for (x, ch) in line.chars().enumerate() {
-                let mut sprite = font.get_sprite(ch as i32);
-                sprite.set_position(Vector2f::new(
-                    (x as i32 * font_width) as f32,
-                    (start_y + y as i32 * font_height) as f32,
-                ));
-                sprite.set_scale(Vector2f::new(
-                    self.font_scale as f32,
-                    self.font_scale as f32,
-                ));
-                self.texture.draw_with_renderstates(&sprite, &states_fg_bg);
+                if skip_chars > 1 {
+                    skip_chars -= 1;
+                    skipped_chars += 1;
+                } else if ch == 27 as char {
+                    skipped_chars += 1;
+                    match ansi_colors.parse_ansi_color_code(&line[x..]) {
+                        (skip, Some(ColorType::Regular(color))) => {
+                            skip_chars = skip;
+                            fg = ansi_colors.get_color_from_ansi(color);
+                        }
+                        (skip, Some(ColorType::HighIntensity(color))) => {
+                            skip_chars = skip;
+                            fg = ansi_colors.get_color_from_ansi(color);
+                        }
+                        (skip, Some(ColorType::Background(color))) => {
+                            skip_chars = skip;
+                            bg = ansi_colors.get_color_from_ansi(color);
+                        }
+                        (skip, Some(ColorType::BackgroundHighIntensity(color))) => {
+                            skip_chars = skip;
+                            bg = ansi_colors.get_color_from_ansi(color);
+                        }
+                        (skip, Some(ColorType::Reset)) => {
+                            skip_chars = skip;
+                            fg = self.fg_color;
+                            bg = self.bg_color;
+                        }
+                        (skip, Some(ColorType::Bold)) => {
+                            skip_chars = skip;
+                            //self.bold = true; // TODO
+                        }
+                        (skip, None) => {
+                            skip_chars = skip;
+                            eprintln!("Unrecognized ANSI color code: {}", line);
+                        }
+                    };
+                    Text::set_shader_parameters(&mut self.shader, font, fg, bg, self.bold);
+                } else {
+                    let mut sprite = font.get_sprite(ch as i32);
+                    sprite.set_position(Vector2f::new(
+                        ((x - skipped_chars) as i32 * font_width) as f32,
+                        (start_y + y as i32 * font_height) as f32,
+                    ));
+                    sprite.set_scale(Vector2f::new(
+                        self.font_scale as f32,
+                        self.font_scale as f32,
+                    ));
+                    let mut states_fg_bg = RenderStates::default();
+                    states_fg_bg.set_shader(Some(&self.shader));
+                    self.texture.draw_with_renderstates(&sprite, &states_fg_bg);
+                }
             }
         }
     }
@@ -226,7 +283,13 @@ impl<'a> Text<'a> {
         let font_width = font.char_size.x * self.font_scale;
         let font_height = font.char_size.y * self.font_scale;
 
-        self.set_shader_parameters(font, self.bg_color, self.fg_color);
+        Text::set_shader_parameters(
+            &mut self.shader,
+            font,
+            self.bg_color,
+            self.fg_color,
+            self.bold,
+        );
         let mut states_bg_fg = RenderStates::default();
         states_bg_fg.set_shader(Some(&self.shader));
 
