@@ -15,6 +15,7 @@ members = [
     "font",
     "text",
     "edit",
+    "color",
     "font_editor",
     "rqsh",
 ]
@@ -32,3 +33,4 @@ sfml = "0.21"
 font = { path = "font" }
 text = { path = "text" }
 edit = { path = "edit" }
+color = { path = "color" }

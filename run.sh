@@ -9,35 +9,57 @@ exe_name=`basename $dirname`
 exe_name=rqsh
 ################
 
+scan_error_last_40_lines() {
+  awk '/^error/{c++; if (c==2) {exit}} {print}' | tail -40
+}
+
+function error_to_clipboard() {
+  error_lines_count=`cat error.txt | wc -l`
+  echo "error_lines_count $1: $error_lines_count"
+
+  # remove escape codes
+  [[ $error_lines_count -gt 7 ]] && cat error.txt |
+      sed 's/\x1b\[[0-9;]*m//g' |
+      scan_error_last_40_lines |
+      xclip -i
+  echo --------------------------------------------------------------------------------
+  cat error.txt
+}
+
+function wait_and_run() {
+  echo "ret: $r"
+  echo --------------------------------------------------------------------------------
+  inotifywait -q -e close_write */src Cargo.toml */Cargo.toml resources/*.frag
+  clear
+
+  exec ./run.sh
+}
+
 pid=`ps -eo pid,comm|grep -w "$exe_name"|awk '{print $1}'`
 [[ -n $pid ]] && { echo "Kill $pid"; kill $pid; }
 
 cargo fmt
-cargo clippy 2>&1 | head -40 | tee error.txt
-if [[ "$?" -eq 0 ]]; then
-    [[ -f .env ]] && source .env
-    cargo test && {
-	echo --------------------------------------------------------------------------------
-	rg --color=always '#\[allow\((dead_code|unused_variables)\)\]'
-	#unbuffer cargo run -p font_editor &
-	unbuffer cargo run &
-    }
-else
-    clear
-    unbuffer cargo clippy 2>&1 | head -40
-fi
+cargo clippy -- -D warnings 2>&1 | scan_error_last_40_lines | tee error.txt
+r=$?
+error_to_clipboard clippy
+[[ "$r" -ne 0 ]] && wait_and_run
 
-error_lines_count=`cat error.txt | wc -l`
-echo "error_lines_count: $error_lines_count"
+cargo clippy --tests -- -D warnings 2>&1 | scan_error_last_40_lines | tee error.txt
+r=$?
+error_to_clipboard clippy_tests
+[[ "$r" -ne 0 ]] && wait_and_run
 
-# remove escape codes
-[[ $error_lines_count -gt 7 ]] && cat error.txt |
-    sed 's/\x1b\[[0-9;]*m//g' |
-    awk '/^error/{c++; if (c==2) {exit}} {print}' error.txt |
-    xclip -i
 
-echo --------------------------------------------------------------------------------
-inotifywait -q -e close_write */src Cargo.toml */Cargo.toml resources/*.frag
-clear
+[[ -f .env ]] && source .env
+cargo test --workspace --color=always -- --nocapture 2>&1 | scan_error_last_40_lines | tee error.txt
+r=$?
+echo one
+[[ "$r" -ne 0 ]] && wait_and_run
+echo two
+error_to_clipboard tests
 
-exec ./run.sh
+
+rg --color=always '#\[allow\((dead_code|unused_variables)\)\]'
+#unbuffer cargo run -p font_editor &
+unbuffer cargo run &
+wait_and_run

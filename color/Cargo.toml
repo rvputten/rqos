@@ -1,5 +1,5 @@
 [package]
-name = "rqsh"
+name = "color"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,3 @@ edition = "2021"
 
 [dependencies]
 sfml = "0.21"
-color = { path = "../color" }
-text = { path = "../text" }
-edit = { path = "../edit" }
-font = { path = "../font" }

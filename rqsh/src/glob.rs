@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_glob() {
-        let strings = vec!["abc", "abcd", "abcde"]
+        let strings = ["abc", "abcd", "abcde"]
             .iter()
             .map(|s| s.to_string())
             .collect();

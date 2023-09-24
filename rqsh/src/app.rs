@@ -49,6 +49,10 @@ impl App<'_> {
         window.set_position(Vector2i::new(window_pos_x, window_pos_y));
         window.set_vertical_sync_enabled(true);
 
+        let colors = color::AnsiColor::new();
+        let yellow = colors.get_color("Yellow").unwrap();
+        let light_blue = colors.get_color("Light Blue").unwrap();
+
         let main_text = text::Text::new(
             Vector2i::new(0, 0),
             Vector2i::new(
@@ -57,7 +61,7 @@ impl App<'_> {
             ),
             text::VerticalAlignment::AlwaysBottom,
             font_scale,
-            Color::rgb(0xad, 0xd8, 0xe6),
+            light_blue,
             Color::BLACK,
             false,
             text::CursorState::Hidden,
@@ -68,7 +72,7 @@ impl App<'_> {
             Vector2i::new(dir_window_width, window_height - font_height * 2),
             text::VerticalAlignment::AlwaysBottom,
             font_scale,
-            Color::rgb(0xad, 0xd8, 0xe6),
+            light_blue,
             Color::BLACK,
             false,
             text::CursorState::Hidden,
@@ -80,7 +84,7 @@ impl App<'_> {
             text::VerticalAlignment::AlwaysTop,
             font_scale,
             Color::BLACK,
-            Color::rgb(0xf0, 0xc7, 0x00),
+            yellow,
             false,
             text::CursorState::Hidden,
         );
