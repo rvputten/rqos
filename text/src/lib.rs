@@ -146,93 +146,114 @@ impl<'a> Text<'a> {
         }
     }
 
-    pub fn draw(&mut self, window: &mut RenderWindow, font: &font::Font) {
-        if self.redraw {
-            let text = if self.scroll_pos_y < 0 {
-                let m = (-self.scroll_pos_y) as usize;
-                let m = self.text.len() - m;
-                self.text[..m].to_vec()
-            } else {
-                self.text.clone()
-            };
-            let font_height = font.char_size.y * self.font_scale;
-            let font_width = font.char_size.x * self.font_scale;
+    fn calculate_scroll_position(&self, font: &font::Font) -> (Vec<String>, i32, i32) {
+        let text = if self.scroll_pos_y < 0 {
+            let m = (-self.scroll_pos_y) as usize;
+            let m = self.text.len() - m;
+            self.text[..m].to_vec()
+        } else {
+            self.text.clone()
+        };
+        let font_height = font.char_size.y * self.font_scale;
 
-            let fully_visible_lines = self.texture.size().y as i32 / font_height;
-            let partially_visible_lines =
-                (self.texture.size().y as i32 + font_height - 1) / font_height;
+        let fully_visible_lines = self.texture.size().y as i32 / font_height;
+        let partially_visible_lines =
+            (self.texture.size().y as i32 + font_height - 1) / font_height;
 
-            let text_len = text.len() as i32;
-            let fully_shown_lines = fully_visible_lines.min(text_len);
-            let partially_shown_lines = partially_visible_lines.min(text_len);
+        let text_len = text.len() as i32;
+        let fully_shown_lines = fully_visible_lines.min(text_len);
+        let partially_shown_lines = partially_visible_lines.min(text_len);
 
-            let partially_skipped_lines = text_len - partially_shown_lines;
-            let fully_skipped_lines = text_len - fully_shown_lines;
-            let start_y = if fully_skipped_lines > 0 {
-                self.texture.size().y as i32 - partially_shown_lines * font_height
-            } else {
-                0
-            };
+        let partially_skipped_lines = text_len - partially_shown_lines;
+        let fully_skipped_lines = text_len - fully_shown_lines;
+        let start_y = if fully_skipped_lines > 0 {
+            self.texture.size().y as i32 - partially_shown_lines * font_height
+        } else {
+            0
+        };
 
-            let (partially_skipped_lines, start_y) = match self.vertical_alignment {
-                VerticalAlignment::AlwaysTop => (0, 0),
-                VerticalAlignment::AlwaysBottom => {
-                    if text_len * font_height > self.texture.size().y as i32 {
-                        (partially_skipped_lines, start_y)
-                    } else {
-                        (0, self.texture.size().y as i32 - text_len * font_height)
-                    }
+        let (partially_skipped_lines, start_y) = match self.vertical_alignment {
+            VerticalAlignment::AlwaysTop => (0, 0),
+            VerticalAlignment::AlwaysBottom => {
+                if text_len * font_height > self.texture.size().y as i32 {
+                    (partially_skipped_lines, start_y)
+                } else {
+                    (0, self.texture.size().y as i32 - text_len * font_height)
                 }
-                VerticalAlignment::BottomOnOverflow => {
-                    if partially_skipped_lines > 0 {
-                        (partially_skipped_lines, start_y)
-                    } else {
-                        (0, 0)
-                    }
-                }
-            };
-
-            {
-                self.set_shader_parameters(font, self.fg_color, self.bg_color);
-                let mut states_fg_bg = RenderStates::default();
-                states_fg_bg.set_shader(Some(&self.shader));
-                self.texture.clear(self.bg_color);
-                for (y, line) in text[partially_skipped_lines as usize..].iter().enumerate() {
-                    for (x, ch) in line.chars().enumerate() {
-                        let mut sprite = font.get_sprite(ch as i32);
-                        sprite.set_position(Vector2f::new(
-                            (x as i32 * font_width) as f32,
-                            (start_y + y as i32 * font_height) as f32,
-                        ));
-                        sprite.set_scale(Vector2f::new(
-                            self.font_scale as f32,
-                            self.font_scale as f32,
-                        ));
-                        self.texture.draw_with_renderstates(&sprite, &states_fg_bg);
-                    }
-                }
-                self.redraw = false;
             }
+            VerticalAlignment::BottomOnOverflow => {
+                if partially_skipped_lines > 0 {
+                    (partially_skipped_lines, start_y)
+                } else {
+                    (0, 0)
+                }
+            }
+        };
+        (text, partially_skipped_lines, start_y)
+    }
 
-            if self.cursor_state != CursorState::Hidden {
-                self.set_shader_parameters(font, self.bg_color, self.fg_color);
-                let mut states_bg_fg = RenderStates::default();
-                states_bg_fg.set_shader(Some(&self.shader));
+    fn draw_text(
+        &mut self,
+        font: &font::Font,
+        text: &[String],
+        partially_skipped_lines: i32,
+        start_y: i32,
+    ) {
+        let font_width = font.char_size.x * self.font_scale;
+        let font_height = font.char_size.y * self.font_scale;
 
-                let ch = text[self.cursor_position.y as usize]
-                    .chars()
-                    .nth(self.cursor_position.x as usize)
-                    .unwrap_or(' ');
+        self.set_shader_parameters(font, self.fg_color, self.bg_color);
+        let mut states_fg_bg = RenderStates::default();
+        states_fg_bg.set_shader(Some(&self.shader));
+        self.texture.clear(self.bg_color);
+        for (y, line) in text[partially_skipped_lines as usize..].iter().enumerate() {
+            for (x, ch) in line.chars().enumerate() {
                 let mut sprite = font.get_sprite(ch as i32);
                 sprite.set_position(Vector2f::new(
-                    (self.cursor_position.x * font_width) as f32,
-                    (start_y + self.cursor_position.y * font_height) as f32,
+                    (x as i32 * font_width) as f32,
+                    (start_y + y as i32 * font_height) as f32,
                 ));
                 sprite.set_scale(Vector2f::new(
                     self.font_scale as f32,
                     self.font_scale as f32,
                 ));
-                self.texture.draw_with_renderstates(&sprite, &states_bg_fg);
+                self.texture.draw_with_renderstates(&sprite, &states_fg_bg);
+            }
+        }
+    }
+
+    fn draw_cursor(&mut self, font: &font::Font, text: &[String], start_y: i32) {
+        let font_width = font.char_size.x * self.font_scale;
+        let font_height = font.char_size.y * self.font_scale;
+
+        self.set_shader_parameters(font, self.bg_color, self.fg_color);
+        let mut states_bg_fg = RenderStates::default();
+        states_bg_fg.set_shader(Some(&self.shader));
+
+        let ch = text[self.cursor_position.y as usize]
+            .chars()
+            .nth(self.cursor_position.x as usize)
+            .unwrap_or(' ');
+        let mut sprite = font.get_sprite(ch as i32);
+        sprite.set_position(Vector2f::new(
+            (self.cursor_position.x * font_width) as f32,
+            (start_y + self.cursor_position.y * font_height) as f32,
+        ));
+        sprite.set_scale(Vector2f::new(
+            self.font_scale as f32,
+            self.font_scale as f32,
+        ));
+        self.texture.draw_with_renderstates(&sprite, &states_bg_fg);
+    }
+
+    pub fn draw(&mut self, window: &mut RenderWindow, font: &font::Font) {
+        if self.redraw {
+            self.redraw = false;
+
+            let (text, partially_skipped_lines, start_y) = self.calculate_scroll_position(font);
+            self.draw_text(font, &text, partially_skipped_lines, start_y);
+            if self.cursor_state != CursorState::Hidden {
+                self.draw_cursor(font, &text, start_y);
             }
         }
         self.texture.display();
