@@ -233,37 +233,46 @@ impl<'a> Text<'a> {
                     skipped_chars += 1;
                 } else if ch == 27 as char {
                     skipped_chars += 1;
-                    match ansi_colors.parse_ansi_color_code(&line[x..]) {
-                        (skip, Some(ColorType::Regular(color))) => {
-                            skip_chars = skip;
-                            fg = ansi_colors.get_color_from_ansi(color);
+                    let (to_skip, codes) = ansi_colors.parse_ansi_color_code(&line[x..]);
+                    skip_chars = to_skip;
+                    if codes.is_empty() {
+                        eprintln!("Unrecognized ANSI escape code: {}", line);
+                    }
+                    for code in codes {
+                        match code {
+                            ColorType::Regular(color) => {
+                                fg = ansi_colors.get_color_from_ansi(color).unwrap_or_else(|| {
+                                    eprintln!("Unrecognized ANSI color: {}", line);
+                                    fg
+                                });
+                            }
+                            ColorType::HighIntensity(color) => {
+                                fg = ansi_colors.get_color_from_ansi(color).unwrap_or_else(|| {
+                                    eprintln!("Unrecognized ANSI color: {}", line);
+                                    fg
+                                });
+                            }
+                            ColorType::Background(color) => {
+                                bg = ansi_colors.get_color_from_ansi(color).unwrap_or_else(|| {
+                                    eprintln!("Unrecognized ANSI color: {}", line);
+                                    bg
+                                });
+                            }
+                            ColorType::BackgroundHighIntensity(color) => {
+                                bg = ansi_colors.get_color_from_ansi(color).unwrap_or_else(|| {
+                                    eprintln!("Unrecognized ANSI color: {}", line);
+                                    bg
+                                });
+                            }
+                            ColorType::Reset => {
+                                fg = self.fg_color;
+                                bg = self.bg_color;
+                            }
+                            ColorType::Bold => {
+                                //self.bold = true; // TODO
+                            }
                         }
-                        (skip, Some(ColorType::HighIntensity(color))) => {
-                            skip_chars = skip;
-                            fg = ansi_colors.get_color_from_ansi(color);
-                        }
-                        (skip, Some(ColorType::Background(color))) => {
-                            skip_chars = skip;
-                            bg = ansi_colors.get_color_from_ansi(color);
-                        }
-                        (skip, Some(ColorType::BackgroundHighIntensity(color))) => {
-                            skip_chars = skip;
-                            bg = ansi_colors.get_color_from_ansi(color);
-                        }
-                        (skip, Some(ColorType::Reset)) => {
-                            skip_chars = skip;
-                            fg = self.fg_color;
-                            bg = self.bg_color;
-                        }
-                        (skip, Some(ColorType::Bold)) => {
-                            skip_chars = skip;
-                            //self.bold = true; // TODO
-                        }
-                        (skip, None) => {
-                            skip_chars = skip;
-                            eprintln!("Unrecognized ANSI color code: {}", line);
-                        }
-                    };
+                    }
                     Text::set_shader_parameters(&mut self.shader, font, fg, bg, self.bold);
                 } else {
                     let mut sprite = font.get_sprite(ch as i32);

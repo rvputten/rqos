@@ -69,7 +69,7 @@ impl App<'_> {
             ),
             text::VerticalAlignment::AlwaysBottom,
             font_scale,
-            light_blue,
+            Color::WHITE,
             Color::BLACK,
             false,
             text::CursorState::Hidden,
@@ -307,7 +307,11 @@ impl App<'_> {
 
             let main_text_window_width =
                 self.main_text.get_size().x / (self.font.char_size.x * self.font_scale);
-            let spaces = " ".repeat(main_text_window_width as usize - command.len());
+            let spaces = if main_text_window_width as usize > command.len() {
+                " ".repeat(main_text_window_width as usize - command.len())
+            } else {
+                "".to_string()
+            };
 
             self.main_text.write(&output);
             self.main_text.write(&format!(

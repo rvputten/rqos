@@ -18,3 +18,5 @@ To do
   - j
   - git diff --color=always
 - variable expansion
+- escape sequence sequences
+  `\0x1b[1;32m`

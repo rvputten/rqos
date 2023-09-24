@@ -146,8 +146,12 @@ impl AnsiColor {
         }
     }
 
-    pub fn get_color_from_ansi(&self, code: usize) -> Color {
-        self.all_colors[code]
+    pub fn get_color_from_ansi(&self, code: usize) -> Option<Color> {
+        if code >= self.all_colors.len() {
+            None
+        } else {
+            Some(self.all_colors[code])
+        }
     }
 
     pub fn get_ansi(&self, name: &str) -> Option<usize> {
@@ -179,51 +183,62 @@ impl AnsiColor {
         self.get_ansi_background(name).map(|x| self.all_colors[x])
     }
 
-    pub fn parse_ansi_color_code(&self, text: &str) -> (usize, Option<ColorType>) {
-        if text.starts_with("\x1b[0m") {
-            return (4, Some(ColorType::Reset));
-        } else if text.starts_with("\x1b[m") {
-            return (3, Some(ColorType::Reset));
-        } else if text.starts_with("\x1b[1m") {
-            return (4, Some(ColorType::Bold));
-        } else if !text.starts_with("\x1b[") {
-            return (0, None);
+    pub fn parse_ansi_color_code(&self, text: &str) -> (usize, Vec<ColorType>) {
+        if !text.starts_with("\x1b[") {
+            return (0, vec![]);
         }
+
         let text = &text[2..];
-        let digits = text
-            .chars()
-            .take_while(|c| c.is_ascii_digit())
-            .collect::<String>();
-        let code = if let Ok(code) = digits.parse::<usize>() {
-            code
-        } else {
-            return (0, None);
-        };
+        let mut idx = 0;
+        let mut codes = vec![];
+        let mut code = 0;
 
-        let len = digits.len();
-        if len == 0 || !(30..=107).contains(&code) {
-            return (0, None);
+        loop {
+            if idx >= text.len() {
+                break;
+            }
+            let c = text.chars().nth(idx).unwrap();
+            match c {
+                '0'..='9' => {
+                    code = code * 10 + c.to_digit(10).unwrap() as usize;
+                }
+                ';' => {
+                    codes.push(code);
+                    code = 0;
+                }
+                'm' => {
+                    codes.push(code);
+                    break;
+                }
+                _ => {
+                    eprintln!("Invalid ANSI color code: {}", text);
+                    return (0, vec![]);
+                }
+            }
+            idx += 1;
         }
+
         let match_code = |x: ColorStarts| code >= x as usize && code <= x as usize + 7;
-        let text = &text[len..];
-        if text.is_empty() || !text.starts_with('m') {
-            eprintln!("Invalid ANSI color code: {}", text);
-            return (0, None);
-        }
 
-        let color = match code {
-            _ if match_code(ColorStarts::Regular) => Some(ColorType::Regular(code)),
-            _ if match_code(ColorStarts::Background) => Some(ColorType::Background(code)),
-            _ if match_code(ColorStarts::HighIntensity) => Some(ColorType::HighIntensity(code)),
-            _ if match_code(ColorStarts::BackgroundHighIntensity) => {
-                Some(ColorType::BackgroundHighIntensity(code))
-            }
-            _ => {
-                eprintln!("Unrecognized ANSI color code: {}", code);
-                None
-            }
-        };
-        (2 + len + 1, color)
+        let mut color_types = vec![];
+        for code in codes {
+            let color = match code {
+                0 => ColorType::Reset,
+                1 => ColorType::Bold,
+                _ if match_code(ColorStarts::Regular) => ColorType::Regular(code),
+                _ if match_code(ColorStarts::Background) => ColorType::Background(code),
+                _ if match_code(ColorStarts::HighIntensity) => ColorType::HighIntensity(code),
+                _ if match_code(ColorStarts::BackgroundHighIntensity) => {
+                    ColorType::BackgroundHighIntensity(code)
+                }
+                _ => {
+                    eprintln!("Unrecognized ANSI color code: {}", code);
+                    return (0, vec![]);
+                }
+            };
+            color_types.push(color);
+        }
+        (2 + idx + 1, color_types)
     }
 }
 
@@ -326,24 +341,28 @@ mod tests {
 
         assert_eq!(
             color.parse_ansi_color_code("\x1b[0m"),
-            (4, Some(ColorType::Reset))
+            (4, vec![ColorType::Reset])
         );
         assert_eq!(
             color.parse_ansi_color_code("\x1b[30m"),
-            (5, Some(ColorType::Regular(30)))
+            (5, vec![ColorType::Regular(30)])
         );
-        assert_eq!(color.parse_ansi_color_code("\x1b[38m"), (5, None));
+        assert_eq!(color.parse_ansi_color_code("\x1b[38m"), (0, vec![]));
         assert_eq!(
             color.parse_ansi_color_code("\x1b[90m"),
-            (5, Some(ColorType::HighIntensity(90)))
+            (5, vec![ColorType::HighIntensity(90)])
         );
         assert_eq!(
             color.parse_ansi_color_code("\x1b[40m"),
-            (5, Some(ColorType::Background(40)))
+            (5, vec![ColorType::Background(40)])
         );
         assert_eq!(
             color.parse_ansi_color_code("\x1b[100m"),
-            (6, Some(ColorType::BackgroundHighIntensity(100)))
+            (6, vec![ColorType::BackgroundHighIntensity(100)])
+        );
+        assert_eq!(
+            color.parse_ansi_color_code("\x1b[1;32m"),
+            (7, vec![ColorType::Bold, ColorType::Regular(32)])
         );
     }
 }
