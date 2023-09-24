@@ -118,7 +118,7 @@ impl App<'_> {
             dir_plain: Vec::new(),
         };
 
-        app.update_pwd_directory();
+        app.update_pwd_directory("", 0);
         app
     }
 
@@ -225,9 +225,14 @@ impl App<'_> {
         self.main_text.redraw = true;
     }
 
-    fn update_pwd_directory(&mut self) {
+    fn update_pwd_directory(&mut self, command: &str, return_code: usize) {
         let pwd = std::env::current_dir().unwrap();
-        self.status_line.replace(vec![format!("{}", pwd.display())]);
+        let text = if command.is_empty() {
+            format!("{}", pwd.display())
+        } else {
+            format!("{} ({}) {}", pwd.display(), return_code, command)
+        };
+        self.status_line.replace(vec![text]);
 
         let mut dir_adorned = String::new();
         let mut dir_plain = String::new();
@@ -273,39 +278,44 @@ impl App<'_> {
                 }
             }
             let expanded_str: Vec<&str> = expanded.iter().map(AsRef::as_ref).collect();
-            let (ret, output) = if let Some((ret, output)) = BuiltIn::run(&expanded_str) {
-                (ret, output)
-            } else if let Ok(result) = std::process::Command::new(expanded_str[0])
-                .args(&expanded_str[1..])
-                .output()
-            {
-                let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
-                let stderr = String::from_utf8_lossy(&result.stderr).into_owned();
-                let lines: Vec<String> = stdout
-                    .lines()
-                    .chain(stderr.lines())
-                    .map(|s| s.to_string())
-                    .collect();
-                (result.status.code().unwrap_or(1), lines)
-            } else {
-                (1, vec!["Command failed to execute".to_string()])
-            };
+            let (return_code, output) =
+                if let Some((return_code, output)) = BuiltIn::run(&expanded_str) {
+                    (return_code, output)
+                } else if let Ok(result) = std::process::Command::new(expanded_str[0])
+                    .args(&expanded_str[1..])
+                    .output()
+                {
+                    let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
+                    let stderr = String::from_utf8_lossy(&result.stderr).into_owned();
+                    let lines: Vec<String> = stdout
+                        .lines()
+                        .chain(stderr.lines())
+                        .map(|s| s.to_string())
+                        .collect();
+                    (result.status.code().unwrap_or(1), lines)
+                } else {
+                    (1, vec!["Command failed to execute".to_string()])
+                };
+            let command = expanded_str.join(" ");
             let output = output.join("\n");
             let colors = color::AnsiColor::new();
-            let red = format!("\x1b[{}m", colors.get_ansi("Red").unwrap());
-            let _black = format!("\x1b[{}m", colors.get_ansi("Black").unwrap());
+            let red_bg = format!("\x1b[{}m", colors.get_ansi_background("Red").unwrap());
+            let green_bg = format!("\x1b[{}m", colors.get_ansi_background("Green").unwrap());
+            let bg = if return_code == 0 { green_bg } else { red_bg };
+            let black_fg = format!("\x1b[{}m", colors.get_ansi("Black").unwrap());
             let reset = "\x1b[0m";
 
-            self.main_text.write(&format!(
-                "\n{}`{}` returned {}{}\n",
-                red,
-                expanded_str.join(" "),
-                ret,
-                reset,
-            ));
-            self.main_text.write(&output);
+            let main_text_window_width =
+                self.main_text.get_size().x / (self.font.char_size.x * self.font_scale);
+            let spaces = " ".repeat(main_text_window_width as usize - command.len());
 
-            self.update_pwd_directory();
+            self.main_text.write(&output);
+            self.main_text.write(&format!(
+                "\n{}{}`{}` returned {}{}{}\n",
+                bg, black_fg, command, return_code, spaces, reset,
+            ));
+
+            self.update_pwd_directory(&command, return_code as usize);
         }
     }
 }

@@ -5,10 +5,16 @@ To do
 - nicer presentation of command outputs
   - invert colors of command line
     - may be multiple lines
+  - return code and last command in status line
 - history with ESC/j/k
   - move command output with j/k
     - record positions in scroll buffer for every command
 - tab completion
 - completion of files not in the local directory
-- Ctrl-H
-- Ctrl-U
+- better parsing of command line
+  - double quotes
+    - for git commit message
+- aliases
+  - j
+  - git diff --color=always
+- variable expansion

@@ -92,6 +92,10 @@ impl<'a> Text<'a> {
         self.redraw = true;
     }
 
+    pub fn get_size(&self) -> Vector2i {
+        Vector2i::new(self.texture.size().x as i32, self.texture.size().y as i32)
+    }
+
     pub fn write(&mut self, text: &str) {
         let mut line = if self.text.is_empty() {
             String::new()
