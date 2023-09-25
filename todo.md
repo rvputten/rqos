@@ -17,6 +17,9 @@ To do
 - aliases
   - j
   - git diff --color=always
+  - alias command?
+    - settings for loading and saving aliases?
 - variable expansion
-- escape sequence sequences
-  `\0x1b[1;32m`
+- load and save and edit text
+- output text by commands as it's generated
+- change cursor shape when window not active

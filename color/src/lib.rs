@@ -35,8 +35,13 @@ pub enum ColorType {
     Background(usize),
     HighIntensity(usize),
     BackgroundHighIntensity(usize),
+    RgbFg(u8, u8, u8),
+    RgbBg(u8, u8, u8),
+    ResetFg,
+    ResetBg,
     Reset,
     Bold,
+    Italic,
 }
 
 #[derive(Clone, Copy)]
@@ -218,27 +223,117 @@ impl AnsiColor {
             idx += 1;
         }
 
-        let match_code = |x: ColorStarts| code >= x as usize && code <= x as usize + 7;
-
         let mut color_types = vec![];
-        for code in codes {
-            let color = match code {
-                0 => ColorType::Reset,
-                1 => ColorType::Bold,
-                _ if match_code(ColorStarts::Regular) => ColorType::Regular(code),
-                _ if match_code(ColorStarts::Background) => ColorType::Background(code),
-                _ if match_code(ColorStarts::HighIntensity) => ColorType::HighIntensity(code),
-                _ if match_code(ColorStarts::BackgroundHighIntensity) => {
-                    ColorType::BackgroundHighIntensity(code)
+        let len = codes.len();
+        const NONE: usize = 256;
+        const FAINT: usize = 2;
+        const FG_S: usize = ColorStarts::Regular as usize;
+        const FG_E: usize = FG_S + 7;
+        const BG_S: usize = ColorStarts::Background as usize;
+        const BG_E: usize = BG_S + 7;
+        const HI_S: usize = ColorStarts::HighIntensity as usize;
+        const HI_E: usize = HI_S + 7;
+        const HIBG_S: usize = ColorStarts::BackgroundHighIntensity as usize;
+        const HIBG_E: usize = HIBG_S + 7;
+        codes.extend(vec![NONE; 8 - len]);
+        let mut i = 0;
+        loop {
+            if i >= len {
+                break;
+            }
+            match (codes[i], codes[i + 1]) {
+                (0, _) => color_types.push(ColorType::Reset),
+                (1, _) => color_types.push(ColorType::Bold),
+                (FAINT, _) => eprintln!("ANSI color code 2 `Faint` not implemented"),
+                (3, _) => color_types.push(ColorType::Italic),
+                (4, _) => eprintln!("ANSI color code 4 `Underline` not implemented"),
+                (9, _) => eprintln!("ANSI color code 9 `Strikethrough` not implemented"),
+                (21, _) => eprintln!("ANSI color code 21 `BoldOff` not implemented"),
+                (22, _) => eprintln!("ANSI color code 22 `BoldOff` not implemented"),
+                (23, _) => eprintln!("ANSI color code 23 `ItalicOff` not implemented"),
+                (24, _) => eprintln!("ANSI color code 24 `UnderlineOff` not implemented"),
+                (25, _) => eprintln!("ANSI color code 25 `BlinkOff` not implemented"),
+                (FG_S..=FG_E, _) => color_types.push(ColorType::Regular(codes[i])),
+                (BG_S..=BG_E, _) => color_types.push(ColorType::Background(codes[i])),
+                (HI_S..=HI_E, _) => color_types.push(ColorType::HighIntensity(codes[i])),
+                (HIBG_S..=HIBG_E, _) => {
+                    color_types.push(ColorType::BackgroundHighIntensity(codes[i]))
                 }
+                (38, 5) => {
+                    if let Some(color) = self.decode_8_bit(codes[i + 2]) {
+                        color_types.push(ColorType::RgbFg(color.0, color.1, color.2));
+                        i += 2;
+                    }
+                }
+                (48, 5) => {
+                    if let Some(color) = self.decode_8_bit(codes[i + 2]) {
+                        color_types.push(ColorType::RgbBg(color.0, color.1, color.2));
+                        i += 2;
+                    }
+                }
+                (38, 2) => {
+                    if let Some(color) =
+                        self.decode_24_bit(codes[i + 2], codes[i + 3], codes[i + 4])
+                    {
+                        color_types.push(ColorType::RgbFg(color.0, color.1, color.2));
+                        i += 4;
+                    }
+                }
+                (48, 2) => {
+                    if let Some(color) =
+                        self.decode_24_bit(codes[i + 2], codes[i + 3], codes[i + 4])
+                    {
+                        color_types.push(ColorType::RgbBg(color.0, color.1, color.2));
+                        i += 4;
+                    }
+                }
+                (39, _) => color_types.push(ColorType::ResetFg),
+                (49, _) => color_types.push(ColorType::ResetBg),
                 _ => {
-                    eprintln!("Unrecognized ANSI color code: {}", code);
+                    eprintln!("Unrecognized ANSI color code: {}", codes[i]);
                     return (0, vec![]);
                 }
             };
-            color_types.push(color);
+            i += 1;
         }
         (2 + idx + 1, color_types)
+    }
+
+    fn decode_8_bit(&self, code: usize) -> Option<(u8, u8, u8)> {
+        if code > 255 {
+            return None;
+        }
+        let decode = |code: usize| -> (u8, u8, u8) {
+            let mut code = code;
+            let b = code % 6;
+            code /= 6;
+            let g = code % 6;
+            code /= 6;
+            let r = code % 6;
+            (r as u8, g as u8, b as u8)
+        };
+        if code <= 7 {
+            let c = self.regular_colors[code];
+            Some((c.r, c.g, c.b))
+        } else if code <= 15 {
+            let c = self.high_intensity_colors[code - 8];
+            Some((c.r, c.g, c.b))
+        } else if code < 232 {
+            Some(decode(code - 16))
+        } else {
+            let code = code - 232;
+            let r = code * 10 + code;
+            let g = r;
+            let b = r;
+            Some((r as u8, g as u8, b as u8))
+        }
+    }
+
+    fn decode_24_bit(&self, r: usize, g: usize, b: usize) -> Option<(u8, u8, u8)> {
+        if r > 255 || g > 255 || b > 255 {
+            return None;
+        }
+        Some((r as u8, g as u8, b as u8))
     }
 }
 
@@ -364,5 +459,6 @@ mod tests {
             color.parse_ansi_color_code("\x1b[1;32m"),
             (7, vec![ColorType::Bold, ColorType::Regular(32)])
         );
+        assert_eq!(color.parse_ansi_color_code("\x1b[186m"), (0, vec![]));
     }
 }

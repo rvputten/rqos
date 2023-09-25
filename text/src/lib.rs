@@ -60,11 +60,7 @@ impl<'a> Text<'a> {
         bold: bool,
         cursor_state: CursorState,
     ) -> Self {
-        let shader_file = if bold {
-            "resources/color_bold.frag"
-        } else {
-            "resources/color.frag"
-        };
+        let shader_file = "resources/color_bold.frag";
         let shader = Shader::from_file(shader_file, ShaderType::Fragment).unwrap();
 
         Self {
@@ -138,24 +134,6 @@ impl<'a> Text<'a> {
         old_text
     }
 
-    fn set_shader_parameters(
-        shader: &mut Shader,
-        font: &font::Font,
-        fg_color: Color,
-        bg_color: Color,
-        bold: bool,
-    ) {
-        shader.set_uniform_vec4("fg_color", glsl::Vec4::from(fg_color));
-        shader.set_uniform_vec4("bg_color", glsl::Vec4::from(bg_color));
-        if bold {
-            let font_texture_size = font.texture.size();
-            shader.set_uniform_vec2(
-                "texture_size",
-                glsl::Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
-            );
-        }
-    }
-
     fn calculate_scroll_position(&self, font: &font::Font) -> (Vec<String>, i32, i32) {
         let text = if self.scroll_pos_y < 0 {
             let m = (-self.scroll_pos_y) as usize;
@@ -212,18 +190,39 @@ impl<'a> Text<'a> {
         let ansi_colors = color::AnsiColor::new();
         let font_width = font.char_size.x * self.font_scale;
         let font_height = font.char_size.y * self.font_scale;
+        let bold_offset = if font.char_size.x > 12 { 2.0 } else { 1.0 }; // try to guess if font
+                                                                         // stroke is 2 pixels
 
-        let mut fg = self.fg_color;
-        let mut bg = self.bg_color;
-
-        Text::set_shader_parameters(
-            &mut self.shader,
-            font,
-            self.fg_color,
-            self.bg_color,
-            self.bold,
+        let font_texture_size = font.texture.size();
+        self.shader.set_uniform_vec2(
+            "texture_size",
+            glsl::Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
         );
+
+        macro_rules! set_fg {
+            ($fg:expr) => {
+                self.shader
+                    .set_uniform_vec4("fg_color", glsl::Vec4::from($fg))
+            };
+        }
+        macro_rules! set_bg {
+            ($bg:expr) => {
+                self.shader
+                    .set_uniform_vec4("bg_color", glsl::Vec4::from($bg))
+            };
+        }
+        macro_rules! set_bold {
+            ($bold:expr) => {
+                self.shader
+                    .set_uniform_float("bold_offset", if $bold { bold_offset } else { 0.0 })
+            };
+        }
+        set_fg!(self.fg_color);
+        set_bg!(self.bg_color);
+        set_bold!(self.bold);
+
         self.texture.clear(self.bg_color);
+
         for (y, line) in text[partially_skipped_lines as usize..].iter().enumerate() {
             let mut skip_chars = 0;
             let mut skipped_chars = 0;
@@ -241,39 +240,34 @@ impl<'a> Text<'a> {
                     for code in codes {
                         match code {
                             ColorType::Regular(color) => {
-                                fg = ansi_colors.get_color_from_ansi(color).unwrap_or_else(|| {
-                                    eprintln!("Unrecognized ANSI color: {}", line);
-                                    fg
-                                });
+                                set_fg!(ansi_colors.get_color_from_ansi(color).unwrap())
                             }
                             ColorType::HighIntensity(color) => {
-                                fg = ansi_colors.get_color_from_ansi(color).unwrap_or_else(|| {
-                                    eprintln!("Unrecognized ANSI color: {}", line);
-                                    fg
-                                });
+                                set_fg!(ansi_colors.get_color_from_ansi(color).unwrap())
                             }
                             ColorType::Background(color) => {
-                                bg = ansi_colors.get_color_from_ansi(color).unwrap_or_else(|| {
-                                    eprintln!("Unrecognized ANSI color: {}", line);
-                                    bg
-                                });
+                                set_bg!(ansi_colors.get_color_from_ansi(color).unwrap())
                             }
                             ColorType::BackgroundHighIntensity(color) => {
-                                bg = ansi_colors.get_color_from_ansi(color).unwrap_or_else(|| {
-                                    eprintln!("Unrecognized ANSI color: {}", line);
-                                    bg
-                                });
+                                set_bg!(ansi_colors.get_color_from_ansi(color).unwrap())
                             }
+                            ColorType::ResetFg => set_fg!(self.fg_color),
+                            ColorType::ResetBg => set_bg!(self.bg_color),
+                            ColorType::RgbFg(r, g, b) => set_fg!(Color::rgb(r, g, b)),
+                            ColorType::RgbBg(r, g, b) => set_bg!(Color::rgb(r, g, b)),
                             ColorType::Reset => {
-                                fg = self.fg_color;
-                                bg = self.bg_color;
+                                set_fg!(self.fg_color);
+                                set_bg!(self.bg_color);
+                                set_bold!(false);
+                                println!("Reset");
                             }
                             ColorType::Bold => {
-                                //self.bold = true; // TODO
+                                set_bold!(true);
+                                println!("Bold");
                             }
+                            ColorType::Italic => {}
                         }
                     }
-                    Text::set_shader_parameters(&mut self.shader, font, fg, bg, self.bold);
                 } else {
                     let mut sprite = font.get_sprite(ch as i32);
                     sprite.set_position(Vector2f::new(
@@ -296,13 +290,13 @@ impl<'a> Text<'a> {
         let font_width = font.char_size.x * self.font_scale;
         let font_height = font.char_size.y * self.font_scale;
 
-        Text::set_shader_parameters(
-            &mut self.shader,
-            font,
-            self.bg_color,
-            self.fg_color,
-            self.bold,
-        );
+        self.shader
+            .set_uniform_vec4("fg_color", glsl::Vec4::from(self.bg_color));
+        self.shader
+            .set_uniform_vec4("bg_color", glsl::Vec4::from(self.fg_color));
+        self.shader
+            .set_uniform_float("bold_offset", if self.bold { 1.0 } else { 0.0 });
+
         let mut states_bg_fg = RenderStates::default();
         states_bg_fg.set_shader(Some(&self.shader));
 
