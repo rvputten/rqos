@@ -1,3 +1,6 @@
+use std::io::{BufReader, Read};
+use std::process::{Command, Stdio};
+
 use sfml::graphics::{Color, RenderTarget, RenderWindow};
 use sfml::system::Vector2i;
 use sfml::window::{Event, Key, Style};
@@ -288,24 +291,59 @@ impl App<'_> {
                 }
             }
             let expanded_str: Vec<&str> = expanded.iter().map(AsRef::as_ref).collect();
-            let (return_code, output) =
-                if let Some((return_code, output)) = BuiltIn::run(&expanded_str) {
-                    (return_code, output)
-                } else if let Ok(result) = std::process::Command::new(expanded_str[0])
-                    .args(&expanded_str[1..])
-                    .output()
-                {
-                    let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
-                    let stderr = String::from_utf8_lossy(&result.stderr).into_owned();
-                    let lines: Vec<String> = stdout
-                        .lines()
-                        .chain(stderr.lines())
-                        .map(|s| s.to_string())
-                        .collect();
-                    (result.status.code().unwrap_or(1), lines)
-                } else {
-                    (1, vec!["Command failed to execute".to_string()])
-                };
+            let (return_code, output) = match BuiltIn::run(&expanded_str) {
+                Some((return_code, output)) => (return_code, output),
+                _ => {
+                    if let Ok(mut child) = Command::new(expanded_str[0])
+                        .args(&expanded_str[1..])
+                        .stdout(Stdio::piped())
+                        .spawn()
+                    {
+                        if let Some(ref mut stdout) = child.stdout {
+                            let mut reader = BufReader::new(stdout);
+                            let mut buffer = [0; 1024];
+
+                            loop {
+                                match reader.read(&mut buffer) {
+                                    Ok(0) => break,
+                                    Ok(size) => {
+                                        let bytes = &buffer[..size];
+                                        match std::str::from_utf8(bytes) {
+                                            Ok(s) => {
+                                                println!("ok: {}", s.trim());
+                                                self.main_text.write(s);
+                                                self.main_text.draw(&mut self.window, &self.font);
+                                                self.window.display();
+                                            }
+                                            Err(e) => {
+                                                if !e.valid_up_to() == 0 {
+                                                    let partial_string = std::str::from_utf8(
+                                                        &bytes[..e.valid_up_to()],
+                                                    )
+                                                    .unwrap();
+                                                    println!("partial: {}", partial_string);
+                                                    self.main_text.write(partial_string);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!("Error executing command: {}", e);
+                                        break;
+                                    }
+                                }
+                            }
+                        }; // if let Some(ref mut stdout) = child.stdout
+                        let return_code = child.wait().unwrap().code().unwrap();
+                        (return_code, vec![])
+                    } else {
+                        (
+                            1,
+                            vec![format!("Error executing command: {}", expanded_str[0])],
+                        )
+                    } // if let Ok(mut child) = Command::new(expanded_str[0])
+                }
+            };
             let command = expanded_str.join(" ");
             let output = output.join("\n");
             let colors = color::AnsiColor::new();
