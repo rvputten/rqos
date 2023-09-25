@@ -15,6 +15,7 @@ scan_error_first_40_lines() {
 
 function error_to_clipboard() {
   error_lines_count=`cat error.txt | wc -l`
+  clear
   echo "error_lines_count $1: $error_lines_count"
 
   # remove escape codes

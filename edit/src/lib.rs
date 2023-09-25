@@ -44,6 +44,10 @@ impl Edit<'_> {
         }
     }
 
+    pub fn set_cursor_state(&mut self, cursor_state: text::CursorState) {
+        self.text.set_cursor_state(cursor_state);
+    }
+
     pub fn write(&mut self, text: &str) {
         self.text.write(text);
     }

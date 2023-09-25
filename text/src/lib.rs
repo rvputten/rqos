@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
+use glsl::{Vec2, Vec4};
 use sfml::graphics::{
     glsl, Color, RenderStates, RenderTarget, RenderTexture, RenderWindow, Shader, ShaderType,
     Sprite, Transformable,
@@ -90,6 +91,11 @@ impl<'a> Text<'a> {
 
     pub fn get_size(&self) -> Vector2i {
         Vector2i::new(self.texture.size().x as i32, self.texture.size().y as i32)
+    }
+
+    pub fn set_cursor_state(&mut self, cursor_state: CursorState) {
+        self.cursor_state = cursor_state;
+        self.redraw = true;
     }
 
     pub fn write(&mut self, text: &str) {
@@ -196,19 +202,17 @@ impl<'a> Text<'a> {
         let font_texture_size = font.texture.size();
         self.shader.set_uniform_vec2(
             "texture_size",
-            glsl::Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
+            Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
         );
 
         macro_rules! set_fg {
             ($fg:expr) => {
-                self.shader
-                    .set_uniform_vec4("fg_color", glsl::Vec4::from($fg))
+                self.shader.set_uniform_vec4("fg_color", Vec4::from($fg))
             };
         }
         macro_rules! set_bg {
             ($bg:expr) => {
-                self.shader
-                    .set_uniform_vec4("bg_color", glsl::Vec4::from($bg))
+                self.shader.set_uniform_vec4("bg_color", Vec4::from($bg))
             };
         }
         macro_rules! set_bold {
@@ -286,14 +290,55 @@ impl<'a> Text<'a> {
         }
     }
 
-    fn draw_cursor(&mut self, font: &font::Font, text: &[String], start_y: i32) {
+    fn draw_cursor_active(&mut self, font: &font::Font, text: &[String], start_y: i32) {
         let font_width = font.char_size.x * self.font_scale;
         let font_height = font.char_size.y * self.font_scale;
 
         self.shader
-            .set_uniform_vec4("fg_color", glsl::Vec4::from(self.bg_color));
+            .set_uniform_vec4("fg_color", Vec4::from(self.bg_color));
         self.shader
-            .set_uniform_vec4("bg_color", glsl::Vec4::from(self.fg_color));
+            .set_uniform_vec4("bg_color", Vec4::from(self.fg_color));
+        self.shader
+            .set_uniform_float("bold_offset", if self.bold { 1.0 } else { 0.0 });
+
+        let mut states_bg_fg = RenderStates::default();
+        states_bg_fg.set_shader(Some(&self.shader));
+
+        let ch = text[self.cursor_position.y as usize]
+            .chars()
+            .nth(self.cursor_position.x as usize)
+            .unwrap_or(' ');
+        let mut sprite = font.get_sprite(ch as i32);
+        sprite.set_position(Vector2f::new(
+            (self.cursor_position.x * font_width) as f32,
+            (start_y + self.cursor_position.y * font_height) as f32,
+        ));
+        sprite.set_scale(Vector2f::new(
+            self.font_scale as f32,
+            self.font_scale as f32,
+        ));
+        self.texture.draw_with_renderstates(&sprite, &states_bg_fg);
+    }
+
+    fn draw_cursor_inactive(&mut self, font: &font::Font, text: &[String], start_y: i32) {
+        let font_width = font.char_size.x * self.font_scale;
+        let font_height = font.char_size.y * self.font_scale;
+        //let stroke_width = if font_width > 10 { 2.0 } else { 1.0 };
+
+        let mix = |fg: Vec4, bg: Vec4| -> Vec4 {
+            Vec4 {
+                x: (fg.x + bg.x) / 2.0,
+                y: (fg.y + bg.y) / 2.0,
+                z: (fg.z + bg.z) / 2.0,
+                w: (fg.w + bg.w) / 2.0,
+            }
+        };
+
+        let fg = mix(Vec4::from(self.fg_color), Vec4::from(self.bg_color));
+
+        self.shader.set_uniform_vec4("bg_color", fg);
+        self.shader
+            .set_uniform_vec4("fg_color", Vec4::from(self.bg_color));
         self.shader
             .set_uniform_float("bold_offset", if self.bold { 1.0 } else { 0.0 });
 
@@ -322,8 +367,10 @@ impl<'a> Text<'a> {
 
             let (text, partially_skipped_lines, start_y) = self.calculate_scroll_position(font);
             self.draw_text(font, &text, partially_skipped_lines, start_y);
-            if self.cursor_state != CursorState::Hidden {
-                self.draw_cursor(font, &text, start_y);
+            match self.cursor_state {
+                CursorState::Active => self.draw_cursor_active(font, &text, start_y),
+                CursorState::Inactive => self.draw_cursor_inactive(font, &text, start_y),
+                CursorState::Hidden => {}
             }
         }
         self.texture.display();

@@ -139,6 +139,8 @@ impl App<'_> {
                     Event::Resized { width, height } => {
                         self.resize_event(width as i32, height as i32)
                     }
+                    Event::GainedFocus => self.set_active(true),
+                    Event::LostFocus => self.set_active(false),
                     _ => {}
                 }
             }
@@ -150,6 +152,14 @@ impl App<'_> {
             self.command.draw(&mut self.window, &self.font);
             self.window.display();
         }
+    }
+
+    fn set_active(&mut self, active: bool) {
+        self.command.set_cursor_state(if active {
+            text::CursorState::Active
+        } else {
+            text::CursorState::Inactive
+        });
     }
 
     fn resize_event(&mut self, width: i32, height: i32) {
