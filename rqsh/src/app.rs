@@ -5,6 +5,7 @@ use sfml::graphics::{Color, RenderTarget, RenderWindow};
 use sfml::system::Vector2i;
 use sfml::window::{Event, Key, Style};
 
+use crate::args::Args;
 use crate::builtin::BuiltIn;
 use crate::execute::{ExecMessage, Execute};
 use crate::glob::Glob;
@@ -286,29 +287,29 @@ impl App<'_> {
         let command = self.command.replace(vec![]);
         if !command.is_empty() && !command[0].is_empty() {
             // Expand glob patterns
-            let args = command[0].split_whitespace().collect::<Vec<_>>();
+            let args = Args::new(&command[0]).args;
             let glob = Glob::from_vec_string(self.dir_plain.clone());
-            let mut expanded = glob.glob(args[0]);
-            if expanded.is_empty() {
-                expanded.push(args[0].to_string());
+            let mut expanded_args = glob.glob(&args[0]);
+            if expanded_args.is_empty() {
+                expanded_args.push(args[0].to_string());
             }
             if args.len() > 1 {
                 for arg in args[1..].iter() {
                     let g = glob.glob(arg);
                     if g.is_empty() {
-                        expanded.push(arg.to_string());
+                        expanded_args.push(arg.to_string());
                     } else {
-                        expanded.extend(g);
+                        expanded_args.extend(g);
                     }
                 }
             }
 
             // Run command as built-in if recognized
-            let expanded_str: Vec<&str> = expanded.iter().map(AsRef::as_ref).collect();
-            let command = expanded_str.join(" ");
+            let args_as_str: Vec<&str> = expanded_args.iter().map(AsRef::as_ref).collect();
+            let command = args_as_str.join(" ");
             self.tx.send(ExecMessage::Command(command.clone())).unwrap();
 
-            if let Some((return_code, output)) = BuiltIn::run(&expanded_str) {
+            if let Some((return_code, output)) = BuiltIn::run(&args_as_str) {
                 self.tx
                     .send(ExecMessage::StdOut(output.join("\n")))
                     .unwrap();
@@ -316,7 +317,7 @@ impl App<'_> {
             } else {
                 let tx = self.tx.clone();
                 thread::spawn(move || {
-                    Execute::run_threaded(tx, expanded);
+                    Execute::run(tx, expanded_args);
                 });
             }
         }

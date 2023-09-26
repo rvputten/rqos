@@ -13,7 +13,7 @@ pub enum ExecMessage {
 pub struct Execute {}
 
 impl Execute {
-    pub fn run_threaded(tx: mpsc::Sender<ExecMessage>, args: Vec<String>) {
+    pub fn run(tx: mpsc::Sender<ExecMessage>, args: Vec<String>) {
         let tx_stdout = tx.clone();
         let tx_stderr = tx.clone();
 
@@ -67,52 +67,6 @@ impl Execute {
             if let Some(stderr) = child.stderr.take() {
                 let reader_stderr = BufReader::new(stderr);
                 thread::spawn(move || send_loop(Box::new(reader_stderr), Box::new(send_stderr)));
-            };
-            let return_code = child.wait().unwrap().code().unwrap();
-            tx.send(ExecMessage::ReturnCode(return_code)).unwrap();
-        } else {
-            tx.send(ExecMessage::StdErr("Error executing command".to_string()))
-                .unwrap();
-            tx.send(ExecMessage::ReturnCode(1)).unwrap();
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn run(tx: mpsc::Sender<ExecMessage>, args: Vec<String>) {
-        if let Ok(mut child) = Command::new(&args[0])
-            .args(&args[1..])
-            .stdout(Stdio::piped())
-            .spawn()
-        {
-            if let Some(ref mut stdout) = child.stdout {
-                let mut reader_stdout = BufReader::new(stdout);
-                let mut buffer = [0; 1024];
-
-                loop {
-                    match reader_stdout.read(&mut buffer) {
-                        Ok(0) => break,
-                        Ok(size) => {
-                            let bytes = &buffer[..size];
-                            match std::str::from_utf8(bytes) {
-                                Ok(s) => {
-                                    tx.send(ExecMessage::StdOut(s.to_string())).unwrap();
-                                }
-                                Err(e) => {
-                                    if !e.valid_up_to() == 0 {
-                                        let partial_string =
-                                            std::str::from_utf8(&bytes[..e.valid_up_to()]).unwrap();
-                                        tx.send(ExecMessage::StdOut(partial_string.to_string()))
-                                            .unwrap();
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            println!("Error executing command: {}", e);
-                            break;
-                        }
-                    }
-                }
             };
             let return_code = child.wait().unwrap().code().unwrap();
             tx.send(ExecMessage::ReturnCode(return_code)).unwrap();
