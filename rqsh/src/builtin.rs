@@ -1,3 +1,7 @@
+use std::sync::mpsc;
+use std::thread;
+
+use crate::execute::{ExecMessage, Execute, Job};
 /*
 1. cd: Change the current directory.
 2. echo: Print arguments to the standard output.
@@ -40,14 +44,28 @@
 pub struct BuiltIn {}
 
 impl BuiltIn {
-    pub fn run(args: &[&str]) -> Option<(i32, Vec<String>)> {
-        match args[0] {
+    pub fn run(tx: mpsc::Sender<ExecMessage>, mut job: Job) {
+        macro_rules! finish {
+            ($return_code:expr, $output:expr) => {
+                job.return_code = Some($return_code);
+                if $output.len() > 0 {
+                    tx.send(ExecMessage::StdOut($output.join("\n"))).unwrap();
+                };
+                job.end();
+                tx.send(ExecMessage::JobDone(job)).unwrap();
+            };
+        }
+
+        let v: Vec<String> = vec![];
+
+        match job.args[0].as_str() {
             "cd" => {
-                if args.len() == 1 {
+                job.start();
+                if job.args.len() == 1 {
                     std::env::set_current_dir(std::env::var("HOME").unwrap()).unwrap();
-                    Some((0, vec![]))
+                    finish!(0, v);
                 } else {
-                    let path = args[1];
+                    let path = &job.args[1];
                     let path = if path == "-" {
                         std::env::var("OLDPWD").unwrap()
                     } else {
@@ -56,17 +74,28 @@ impl BuiltIn {
                     let path = std::path::Path::new(&path);
                     if path.exists() {
                         std::env::set_current_dir(path).unwrap();
-                        Some((0, vec![]))
+                        finish!(0, v);
                     } else {
-                        Some((1, vec![]))
+                        tx.send(ExecMessage::StdErr(format!(
+                            "cd: {}: No such file or directory",
+                            path.display()
+                        )))
+                        .unwrap();
+                        finish!(1, v);
                     }
                 }
             }
             "yes" => {
+                job.start();
                 let output = vec!["yes".to_string()];
-                Some((0, output))
+                finish!(0, output);
             }
-            _ => None,
-        }
+            _ => {
+                let tx = tx.clone();
+                thread::spawn(move || {
+                    Execute::run(tx, job);
+                });
+            }
+        };
     }
 }

@@ -1,5 +1,4 @@
 use std::sync::mpsc;
-use std::thread;
 
 use sfml::graphics::{Color, RenderTarget, RenderWindow};
 use sfml::system::Vector2i;
@@ -7,7 +6,7 @@ use sfml::window::{Event, Key, Style};
 
 use crate::args::Args;
 use crate::builtin::BuiltIn;
-use crate::execute::{ExecMessage, Execute};
+use crate::execute::{ExecMessage, Job};
 use crate::glob::Glob;
 
 enum ScrollType {
@@ -28,7 +27,7 @@ pub struct App<'a> {
     command: edit::Edit<'a>,
     window: RenderWindow,
     dir_plain: Vec<String>,
-    command_history: Vec<String>,
+    jobs: Vec<Job>,
     tx: mpsc::Sender<ExecMessage>,
     rx: mpsc::Receiver<ExecMessage>,
     colors: color::AnsiColor,
@@ -126,13 +125,13 @@ impl App<'_> {
             command,
             window,
             dir_plain: Vec::new(),
-            command_history: Vec::new(),
+            jobs: Vec::new(),
             tx,
             rx,
             colors,
         };
 
-        app.update_pwd_directory("", 0);
+        app.update_pwd_directory();
         app
     }
 
@@ -253,12 +252,14 @@ impl App<'_> {
         self.main_text.redraw = true;
     }
 
-    fn update_pwd_directory(&mut self, command: &str, return_code: i32) {
+    fn update_pwd_directory(&mut self) {
         let pwd = std::env::current_dir().unwrap();
-        let text = if command.is_empty() {
-            format!("{}", pwd.display())
-        } else {
+        let text = if let Some(job) = self.jobs.last() {
+            let return_code = job.return_code.unwrap_or(0);
+            let command = job.args.join(" ");
             format!("{} ({}) {}", pwd.display(), return_code, command)
+        } else {
+            format!("{}", pwd.display())
         };
         self.status_line.replace(vec![text]);
 
@@ -316,26 +317,16 @@ impl App<'_> {
                 expanded_args.join(" "),
                 self.colors.reset()
             ));
-            let args_as_str: Vec<&str> = expanded_args.iter().map(AsRef::as_ref).collect();
-            let command = args_as_str.join(" ");
-            self.tx.send(ExecMessage::Command(command.clone())).unwrap();
 
-            if let Some((return_code, output)) = BuiltIn::run(&args_as_str) {
-                self.tx
-                    .send(ExecMessage::StdOut(output.join("\n")))
-                    .unwrap();
-                self.tx.send(ExecMessage::ReturnCode(return_code)).unwrap();
-            } else {
-                let tx = self.tx.clone();
-                thread::spawn(move || {
-                    Execute::run(tx, expanded_args);
-                });
-            }
+            let job = Job::new(expanded_args);
+            BuiltIn::run(self.tx.clone(), job);
         }
     }
 
-    fn write_intermediate_status_line(&mut self, return_code: i32) {
-        let command = self.command_history.last().unwrap().clone();
+    fn write_intermediate_status_line(&mut self) {
+        let job = self.jobs.last().unwrap();
+        let command = job.args.join(" ");
+        let return_code = job.return_code.unwrap();
         let colors = color::AnsiColor::new();
         let bg = if return_code == 0 {
             colors.bg("Green")
@@ -353,12 +344,22 @@ impl App<'_> {
             "".to_string()
         };
 
-        self.main_text.write(&format!(
-            "\n{}{}`{}` returned {}{}{}\n",
-            bg, fg, command, return_code, spaces, reset,
-        ));
+        match (job.start_time, job.end_time) {
+            (Some(start), Some(end)) => {
+                let duration = end.duration_since(start).unwrap();
+                let duration = format!("{}.{:03}s", duration.as_secs(), duration.subsec_millis());
+                self.main_text.write(&format!(
+                    "\n{}{}`{}` returned {} in {}{}{}\n",
+                    bg, fg, command, return_code, duration, spaces, reset,
+                ));
+            }
+            _ => self.main_text.write(&format!(
+                "\n{}{}`{}` returned {}{}{}\n",
+                bg, fg, command, return_code, spaces, reset,
+            )),
+        };
 
-        self.update_pwd_directory(&command, return_code);
+        self.update_pwd_directory();
     }
 
     fn handle_exec_messages(&mut self, message: ExecMessage) {
@@ -367,13 +368,10 @@ impl App<'_> {
                 self.main_text.write(&output);
                 self.main_text.redraw = true;
             }
-            ExecMessage::ReturnCode(return_code) => {
-                let command = self.command_history.last().unwrap().clone();
-                self.update_pwd_directory(&command, return_code);
-                self.write_intermediate_status_line(return_code);
-            }
-            ExecMessage::Command(command) => {
-                self.command_history.push(command);
+            ExecMessage::JobDone(job) => {
+                self.jobs.push(job);
+                self.update_pwd_directory();
+                self.write_intermediate_status_line();
             }
         }
     }
