@@ -21,5 +21,3 @@ To do
     - settings for loading and saving aliases?
 - variable expansion
 - load and save and edit text
-- output text by commands as it's generated
-- change cursor shape when window not active

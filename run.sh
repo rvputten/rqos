@@ -30,7 +30,7 @@ function error_to_clipboard() {
 function wait_and_run() {
   echo "ret: $r"
   echo --------------------------------------------------------------------------------
-  inotifywait -q -e close_write */src Cargo.toml */Cargo.toml resources/*.frag
+  inotifywait -q -e close_write */src Cargo.toml */Cargo.toml resources/*.{frag,sh}
   clear
 
   exec ./run.sh

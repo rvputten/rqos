@@ -263,11 +263,9 @@ impl<'a> Text<'a> {
                                 set_fg!(self.fg_color);
                                 set_bg!(self.bg_color);
                                 set_bold!(false);
-                                println!("Reset");
                             }
                             ColorType::Bold => {
                                 set_bold!(true);
-                                println!("Bold");
                             }
                             ColorType::Italic => {}
                         }

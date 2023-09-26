@@ -1,11 +1,12 @@
-use std::io::{BufReader, Read};
-use std::process::{Command, Stdio};
+use std::sync::mpsc;
+use std::thread;
 
 use sfml::graphics::{Color, RenderTarget, RenderWindow};
 use sfml::system::Vector2i;
 use sfml::window::{Event, Key, Style};
 
 use crate::builtin::BuiltIn;
+use crate::execute::{ExecMessage, Execute};
 use crate::glob::Glob;
 
 enum ScrollType {
@@ -26,6 +27,9 @@ pub struct App<'a> {
     command: edit::Edit<'a>,
     window: RenderWindow,
     dir_plain: Vec<String>,
+    command_history: Vec<String>,
+    tx: mpsc::Sender<ExecMessage>,
+    rx: mpsc::Receiver<ExecMessage>,
 }
 
 impl App<'_> {
@@ -110,6 +114,7 @@ impl App<'_> {
             false,
         );
 
+        let (tx, rx) = mpsc::channel();
         let mut app = Self {
             font,
             font_scale,
@@ -119,6 +124,9 @@ impl App<'_> {
             command,
             window,
             dir_plain: Vec::new(),
+            command_history: Vec::new(),
+            tx,
+            rx,
         };
 
         app.update_pwd_directory("", 0);
@@ -146,6 +154,10 @@ impl App<'_> {
                     Event::LostFocus => self.set_active(false),
                     _ => {}
                 }
+            }
+
+            while let Ok(message) = self.rx.try_recv() {
+                self.handle_exec_messages(message);
             }
 
             self.window.clear(Color::BLACK);
@@ -238,7 +250,7 @@ impl App<'_> {
         self.main_text.redraw = true;
     }
 
-    fn update_pwd_directory(&mut self, command: &str, return_code: usize) {
+    fn update_pwd_directory(&mut self, command: &str, return_code: i32) {
         let pwd = std::env::current_dir().unwrap();
         let text = if command.is_empty() {
             format!("{}", pwd.display())
@@ -273,7 +285,7 @@ impl App<'_> {
         self.main_text.scroll_pos_y = 0;
         let command = self.command.replace(vec![]);
         if !command.is_empty() && !command[0].is_empty() {
-            // system execute
+            // Expand glob patterns
             let args = command[0].split_whitespace().collect::<Vec<_>>();
             let glob = Glob::from_vec_string(self.dir_plain.clone());
             let mut expanded = glob.glob(args[0]);
@@ -290,84 +302,65 @@ impl App<'_> {
                     }
                 }
             }
+
+            // Run command as built-in if recognized
             let expanded_str: Vec<&str> = expanded.iter().map(AsRef::as_ref).collect();
-            let (return_code, output) = match BuiltIn::run(&expanded_str) {
-                Some((return_code, output)) => (return_code, output),
-                _ => {
-                    if let Ok(mut child) = Command::new(expanded_str[0])
-                        .args(&expanded_str[1..])
-                        .stdout(Stdio::piped())
-                        .spawn()
-                    {
-                        if let Some(ref mut stdout) = child.stdout {
-                            let mut reader = BufReader::new(stdout);
-                            let mut buffer = [0; 1024];
-
-                            loop {
-                                match reader.read(&mut buffer) {
-                                    Ok(0) => break,
-                                    Ok(size) => {
-                                        let bytes = &buffer[..size];
-                                        match std::str::from_utf8(bytes) {
-                                            Ok(s) => {
-                                                println!("ok: {}", s.trim());
-                                                self.main_text.write(s);
-                                                self.main_text.draw(&mut self.window, &self.font);
-                                                self.window.display();
-                                            }
-                                            Err(e) => {
-                                                if !e.valid_up_to() == 0 {
-                                                    let partial_string = std::str::from_utf8(
-                                                        &bytes[..e.valid_up_to()],
-                                                    )
-                                                    .unwrap();
-                                                    println!("partial: {}", partial_string);
-                                                    self.main_text.write(partial_string);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        println!("Error executing command: {}", e);
-                                        break;
-                                    }
-                                }
-                            }
-                        }; // if let Some(ref mut stdout) = child.stdout
-                        let return_code = child.wait().unwrap().code().unwrap();
-                        (return_code, vec![])
-                    } else {
-                        (
-                            1,
-                            vec![format!("Error executing command: {}", expanded_str[0])],
-                        )
-                    } // if let Ok(mut child) = Command::new(expanded_str[0])
-                }
-            };
             let command = expanded_str.join(" ");
-            let output = output.join("\n");
-            let colors = color::AnsiColor::new();
-            let red_bg = format!("\x1b[{}m", colors.get_ansi_background("Red").unwrap());
-            let green_bg = format!("\x1b[{}m", colors.get_ansi_background("Green").unwrap());
-            let bg = if return_code == 0 { green_bg } else { red_bg };
-            let black_fg = format!("\x1b[{}m", colors.get_ansi("Black").unwrap());
-            let reset = "\x1b[0m";
+            self.tx.send(ExecMessage::Command(command.clone())).unwrap();
 
-            let main_text_window_width =
-                self.main_text.get_size().x / (self.font.char_size.x * self.font_scale);
-            let spaces = if main_text_window_width as usize > command.len() {
-                " ".repeat(main_text_window_width as usize - command.len())
+            if let Some((return_code, output)) = BuiltIn::run(&expanded_str) {
+                self.tx
+                    .send(ExecMessage::StdOut(output.join("\n")))
+                    .unwrap();
+                self.tx.send(ExecMessage::ReturnCode(return_code)).unwrap();
             } else {
-                "".to_string()
-            };
+                let tx = self.tx.clone();
+                thread::spawn(move || {
+                    Execute::run_threaded(tx, expanded);
+                });
+            }
+        }
+    }
 
-            self.main_text.write(&output);
-            self.main_text.write(&format!(
-                "\n{}{}`{}` returned {}{}{}\n",
-                bg, black_fg, command, return_code, spaces, reset,
-            ));
+    fn write_intermediate_status_line(&mut self, return_code: i32) {
+        let command = self.command_history.last().unwrap().clone();
+        let colors = color::AnsiColor::new();
+        let red_bg = format!("\x1b[{}m", colors.get_ansi_background("Red").unwrap());
+        let green_bg = format!("\x1b[{}m", colors.get_ansi_background("Green").unwrap());
+        let bg = if return_code == 0 { green_bg } else { red_bg };
+        let black_fg = format!("\x1b[{}m", colors.get_ansi("Black").unwrap());
+        let reset = "\x1b[0m";
 
-            self.update_pwd_directory(&command, return_code as usize);
+        let main_text_window_width =
+            self.main_text.get_size().x / (self.font.char_size.x * self.font_scale);
+        let spaces = if main_text_window_width as usize > command.len() {
+            " ".repeat(main_text_window_width as usize - command.len())
+        } else {
+            "".to_string()
+        };
+
+        self.main_text.write(&format!(
+            "\n{}{}`{}` returned {}{}{}\n",
+            bg, black_fg, command, return_code, spaces, reset,
+        ));
+
+        self.update_pwd_directory(&command, return_code);
+    }
+
+    fn handle_exec_messages(&mut self, message: ExecMessage) {
+        match message {
+            ExecMessage::StdOut(output) | ExecMessage::StdErr(output) => {
+                self.main_text.write(&output);
+                self.main_text.redraw = true;
+            }
+            ExecMessage::ReturnCode(return_code) => {
+                let command = self.command_history.last().unwrap().clone();
+                self.update_pwd_directory(&command, return_code);
+                self.write_intermediate_status_line(return_code);
+            }
+            ExecMessage::Command(command) => {
+                self.command_history.push(command);
+            }
         }
     }
 }

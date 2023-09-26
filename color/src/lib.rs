@@ -52,14 +52,12 @@ enum ColorStarts {
     BackgroundHighIntensity = 100,
 }
 
-#[allow(dead_code)]
 pub struct AnsiColor {
     regular_colors: Vec<Color>,
     high_intensity_colors: Vec<Color>,
     regular_color_names: Vec<String>,
     high_intensity_color_names: Vec<String>,
     all_colors: Vec<Color>,
-    all_names: Vec<String>,
 }
 
 impl AnsiColor {
@@ -121,25 +119,6 @@ impl AnsiColor {
             .iter()
             .map(|x| format!("Light {}", x))
             .collect();
-        let mut all_names = vec!["".to_string(); start_regular];
-        all_names.extend(names_regular.clone());
-        all_names.extend(vec![
-            "".to_string();
-            start_background - start_regular - count
-        ]);
-        all_names.extend(names_regular.clone());
-        all_names.extend(vec![
-            "".to_string();
-            start_high_intensity - start_background - count
-        ]);
-        all_names.extend(names_high_intensity.clone());
-        all_names.extend(vec![
-            "".to_string();
-            start_background_high_intensity
-                - start_high_intensity
-                - count
-        ]);
-        all_names.extend(names_high_intensity.clone());
 
         AnsiColor {
             regular_colors,
@@ -147,7 +126,6 @@ impl AnsiColor {
             regular_color_names: names_regular,
             high_intensity_color_names: names_high_intensity,
             all_colors,
-            all_names,
         }
     }
 
@@ -356,7 +334,6 @@ mod tests {
         assert_eq!(color.regular_color_names.len(), 8);
         assert_eq!(color.high_intensity_color_names.len(), 8);
         assert_eq!(color.all_colors.len(), 108);
-        assert_eq!(color.all_names.len(), 108);
     }
 
     #[test]
