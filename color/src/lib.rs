@@ -166,6 +166,20 @@ impl AnsiColor {
         self.get_ansi_background(name).map(|x| self.all_colors[x])
     }
 
+    pub fn fg(&self, name: &str) -> String {
+        let code = self.get_ansi(name).unwrap_or(0);
+        format!("\x1b[{}m", code)
+    }
+
+    pub fn bg(&self, name: &str) -> String {
+        let code = self.get_ansi_background(name).unwrap_or(0);
+        format!("\x1b[{}m", code)
+    }
+
+    pub fn reset(&self) -> String {
+        "\x1b[0m".to_string()
+    }
+
     pub fn parse_ansi_color_code(&self, text: &str) -> (usize, Vec<ColorType>) {
         if !text.starts_with("\x1b[") {
             return (0, vec![]);

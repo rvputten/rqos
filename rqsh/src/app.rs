@@ -31,6 +31,7 @@ pub struct App<'a> {
     command_history: Vec<String>,
     tx: mpsc::Sender<ExecMessage>,
     rx: mpsc::Receiver<ExecMessage>,
+    colors: color::AnsiColor,
 }
 
 impl App<'_> {
@@ -128,6 +129,7 @@ impl App<'_> {
             command_history: Vec::new(),
             tx,
             rx,
+            colors,
         };
 
         app.update_pwd_directory("", 0);
@@ -283,6 +285,8 @@ impl App<'_> {
     }
 
     fn run_command(&mut self) {
+        let pwd = std::env::current_dir().unwrap();
+
         self.main_text.scroll_pos_y = 0;
         let command = self.command.replace(vec![]);
         if !command.is_empty() && !command[0].is_empty() {
@@ -304,7 +308,14 @@ impl App<'_> {
                 }
             }
 
-            // Run command as built-in if recognized
+            self.main_text.write(&format!(
+                "{}{}{}> {}{}\n",
+                self.colors.bg("Yellow"),
+                self.colors.fg("Black"),
+                pwd.display(),
+                expanded_args.join(" "),
+                self.colors.reset()
+            ));
             let args_as_str: Vec<&str> = expanded_args.iter().map(AsRef::as_ref).collect();
             let command = args_as_str.join(" ");
             self.tx.send(ExecMessage::Command(command.clone())).unwrap();
@@ -326,11 +337,13 @@ impl App<'_> {
     fn write_intermediate_status_line(&mut self, return_code: i32) {
         let command = self.command_history.last().unwrap().clone();
         let colors = color::AnsiColor::new();
-        let red_bg = format!("\x1b[{}m", colors.get_ansi_background("Red").unwrap());
-        let green_bg = format!("\x1b[{}m", colors.get_ansi_background("Green").unwrap());
-        let bg = if return_code == 0 { green_bg } else { red_bg };
-        let black_fg = format!("\x1b[{}m", colors.get_ansi("Black").unwrap());
-        let reset = "\x1b[0m";
+        let bg = if return_code == 0 {
+            colors.bg("Green")
+        } else {
+            colors.bg("Red")
+        };
+        let fg = colors.fg("Black");
+        let reset = colors.reset();
 
         let main_text_window_width =
             self.main_text.get_size().x / (self.font.char_size.x * self.font_scale);
@@ -342,7 +355,7 @@ impl App<'_> {
 
         self.main_text.write(&format!(
             "\n{}{}`{}` returned {}{}{}\n",
-            bg, black_fg, command, return_code, spaces, reset,
+            bg, fg, command, return_code, spaces, reset,
         ));
 
         self.update_pwd_directory(&command, return_code);
