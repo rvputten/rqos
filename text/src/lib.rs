@@ -139,10 +139,6 @@ impl<'a> Text<'a> {
         }
         self.cursor_position.y = self.text.len() as i32 - 1;
         self.cursor_position.x = self.text[self.cursor_position.y as usize].len() as i32;
-        println!(
-            "text replaced: {:?}, cursor: {}/{}",
-            self.text, self.cursor_position.x, self.cursor_position.y
-        );
         self.redraw = true;
         old_text
     }
@@ -320,8 +316,6 @@ impl<'a> Text<'a> {
             }
             CursorState::Hidden => return,
         };
-
-        println!("fg: {:?}, cursor_state: {}", fg, self.cursor_state as usize);
 
         self.shader.set_uniform_vec4("bg_color", fg);
         self.shader

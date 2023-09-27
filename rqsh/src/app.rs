@@ -231,7 +231,6 @@ impl App<'_> {
 
     fn insert_mode_key_pressed(&mut self, code: Key) {
         match code {
-            Key::Escape => self.window.close(),
             Key::Enter => self.run_command(),
             Key::Up => self.scroll(ScrollType::CursorUp),
             Key::Down => self.scroll(ScrollType::CursorDown),

@@ -115,8 +115,11 @@ impl Execute {
             let return_code = child.wait().unwrap().code().unwrap();
             job.return_code = Some(return_code);
         } else {
-            tx.send(ExecMessage::StdErr("Error executing command".to_string()))
-                .unwrap();
+            tx.send(ExecMessage::StdErr(format!(
+                "Error: `{}` not found",
+                job.args_printable()
+            )))
+            .unwrap();
             job.return_code = Some(1);
         }
         job.end();

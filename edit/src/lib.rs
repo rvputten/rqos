@@ -119,7 +119,6 @@ impl Edit<'_> {
                     Key::U => self.text.clear(),
                     Key::LBracket | Key::J => {
                         self.set_mode(Mode::Normal);
-                        println!("Mode: Normal");
                     }
                     _ => {}
                 },
@@ -128,7 +127,6 @@ impl Edit<'_> {
                 (Mode::Normal, S_UP, C_UP) => {
                     if ucode == Key::I as usize || ucode == Key::A as usize {
                         self.set_mode(Mode::Insert);
-                        println!("Mode: Insert");
                     }
                 }
                 (Mode::Normal, S_DN, C_UP) => {}
@@ -140,6 +138,7 @@ impl Edit<'_> {
                 Key::LShift | Key::RShift => self.shift_pressed(true),
                 Key::LControl | Key::RControl => self.control_pressed(true),
                 Key::Backspace => self.backspace(),
+                Key::Escape => self.set_mode(Mode::Normal),
                 _ => {}
             }
         }
