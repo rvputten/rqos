@@ -140,21 +140,17 @@ impl<'a> Text<'a> {
         old_text
     }
 
-    fn calculate_scroll_position(&self, font: &font::Font) -> (Vec<String>, i32, i32) {
-        let text = if self.scroll_pos_y < 0 {
-            let m = (-self.scroll_pos_y) as usize;
-            let m = self.text.len() - m;
-            self.text[..m].to_vec()
-        } else {
-            self.text.clone()
-        };
+    fn calculate_scroll_position(&self, font: &font::Font) -> (usize, i32, i32) {
+        let scroll_up_lines = (-self.scroll_pos_y).max(0) as usize;
+        let text_end = self.text.len() - scroll_up_lines;
+
         let font_height = font.char_size.y * self.font_scale;
 
         let fully_visible_lines = self.texture.size().y as i32 / font_height;
         let partially_visible_lines =
             (self.texture.size().y as i32 + font_height - 1) / font_height;
 
-        let text_len = text.len() as i32;
+        let text_len = text_end as i32;
         let fully_shown_lines = fully_visible_lines.min(text_len);
         let partially_shown_lines = partially_visible_lines.min(text_len);
 
@@ -183,13 +179,13 @@ impl<'a> Text<'a> {
                 }
             }
         };
-        (text, partially_skipped_lines, start_y)
+        (text_end, partially_skipped_lines, start_y)
     }
 
     fn draw_text(
         &mut self,
         font: &font::Font,
-        text: &[String],
+        text_end: usize,
         partially_skipped_lines: i32,
         start_y: i32,
     ) {
@@ -227,7 +223,10 @@ impl<'a> Text<'a> {
 
         self.texture.clear(self.bg_color);
 
-        for (y, line) in text[partially_skipped_lines as usize..].iter().enumerate() {
+        for (y, line) in self.text[partially_skipped_lines as usize..text_end]
+            .iter()
+            .enumerate()
+        {
             let mut skip_chars = 0;
             let mut skipped_chars = 0;
             for (x, ch) in line.chars().enumerate() {
@@ -288,7 +287,7 @@ impl<'a> Text<'a> {
         }
     }
 
-    fn draw_cursor_active(&mut self, font: &font::Font, text: &[String], start_y: i32) {
+    fn draw_cursor_active(&mut self, font: &font::Font, start_y: i32) {
         let font_width = font.char_size.x * self.font_scale;
         let font_height = font.char_size.y * self.font_scale;
 
@@ -302,7 +301,7 @@ impl<'a> Text<'a> {
         let mut states_bg_fg = RenderStates::default();
         states_bg_fg.set_shader(Some(&self.shader));
 
-        let ch = text[self.cursor_position.y as usize]
+        let ch = self.text[self.cursor_position.y as usize]
             .chars()
             .nth(self.cursor_position.x as usize)
             .unwrap_or(' ');
@@ -318,7 +317,7 @@ impl<'a> Text<'a> {
         self.texture.draw_with_renderstates(&sprite, &states_bg_fg);
     }
 
-    fn draw_cursor_inactive(&mut self, font: &font::Font, text: &[String], start_y: i32) {
+    fn draw_cursor_inactive(&mut self, font: &font::Font, start_y: i32) {
         let font_width = font.char_size.x * self.font_scale;
         let font_height = font.char_size.y * self.font_scale;
         //let stroke_width = if font_width > 10 { 2.0 } else { 1.0 };
@@ -343,7 +342,7 @@ impl<'a> Text<'a> {
         let mut states_bg_fg = RenderStates::default();
         states_bg_fg.set_shader(Some(&self.shader));
 
-        let ch = text[self.cursor_position.y as usize]
+        let ch = self.text[self.cursor_position.y as usize]
             .chars()
             .nth(self.cursor_position.x as usize)
             .unwrap_or(' ');
@@ -363,11 +362,11 @@ impl<'a> Text<'a> {
         if self.redraw {
             self.redraw = false;
 
-            let (text, partially_skipped_lines, start_y) = self.calculate_scroll_position(font);
-            self.draw_text(font, &text, partially_skipped_lines, start_y);
+            let (text_end, partially_skipped_lines, start_y) = self.calculate_scroll_position(font);
+            self.draw_text(font, text_end, partially_skipped_lines, start_y);
             match self.cursor_state {
-                CursorState::Active => self.draw_cursor_active(font, &text, start_y),
-                CursorState::Inactive => self.draw_cursor_inactive(font, &text, start_y),
+                CursorState::Active => self.draw_cursor_active(font, start_y),
+                CursorState::Inactive => self.draw_cursor_inactive(font, start_y),
                 CursorState::Hidden => {}
             }
         }
