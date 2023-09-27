@@ -290,7 +290,7 @@ impl App<'_> {
 
         self.main_text.scroll_pos_y = 0;
         let command = self.command.replace(vec![]);
-        if !command.is_empty() && !command[0].is_empty() {
+        if !command.is_empty() && !command[0].trim().is_empty() {
             // Expand glob patterns
             let args = Args::new(&command[0]).args;
             let glob = Glob::from_vec_string(self.dir_plain.clone());
