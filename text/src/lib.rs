@@ -138,7 +138,7 @@ impl<'a> Text<'a> {
             self.text.push(String::new());
         }
         self.cursor_position.y = self.text.len() as i32 - 1;
-        self.cursor_position.x = self.text[self.cursor_position.y as usize].len() as i32;
+        self.cursor_position.x = self.text[self.cursor_position.y as usize].chars().count() as i32;
         self.redraw = true;
         old_text
     }

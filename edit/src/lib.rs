@@ -116,6 +116,7 @@ impl Edit<'_> {
                 (Mode::Insert, S_DN, C_UP) => self.write(&KEYMAP_SHIFT[ucode..ucode + 1]),
                 (Mode::Insert, S_UP, C_DN) => match code {
                     Key::H => self.backspace(),
+                    Key::W => self.delete_word(),
                     Key::U => self.text.clear(),
                     Key::LBracket | Key::J => {
                         self.set_mode(Mode::Normal);
@@ -150,6 +151,31 @@ impl Edit<'_> {
             Key::LControl | Key::RControl => self.control_pressed(false),
             _ => {}
         }
+    }
+
+    fn delete_word(&mut self) {
+        let text = &mut self.text.text;
+        let cursor_position = &mut self.text.cursor_position;
+        let line = &mut text[cursor_position.y as usize].chars().collect::<Vec<_>>();
+        let idx = cursor_position.x as usize;
+        let mut i = idx;
+        loop {
+            if i == 0 || !line[i - 1].is_whitespace() {
+                break;
+            }
+            i -= 1;
+        }
+        loop {
+            if i == 0 || line[i - 1].is_whitespace() {
+                break;
+            }
+            i -= 1;
+        }
+
+        line.drain(i..idx);
+        text[cursor_position.y as usize] = line.iter().collect();
+        cursor_position.x = i as i32;
+        self.text.redraw = true;
     }
 
     fn backspace(&mut self) {

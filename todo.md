@@ -22,3 +22,7 @@ To do
 - variable expansion
 - load and save and edit text
 - change cursor in insert/normal mode
+- insert mode commands
+  - Ctrl-W in insert mode
+  - Ctrl-A+E in insert mode
+
