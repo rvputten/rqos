@@ -9,8 +9,12 @@ exe_name=`basename $dirname`
 exe_name=rqsh
 ################
 
-scan_error_first_40_lines() {
+scan_error_code_first_40_lines() {
   awk '/^error/{c++; if (c==2) {exit}} {print}' | head -40
+}
+
+scan_error_test_last_40_lines() {
+  tail -40
 }
 
 function error_to_clipboard() {
@@ -21,7 +25,7 @@ function error_to_clipboard() {
   # remove escape codes
   [[ $error_lines_count -gt 7 ]] && cat error.txt |
       sed 's/\x1b\[[0-9;]*m//g' |
-      scan_error_first_40_lines |
+      scan_error_code_first_40_lines |
       xclip -i
   echo --------------------------------------------------------------------------------
   cat error.txt
@@ -40,19 +44,19 @@ pid=`ps -eo pid,comm|grep -w "$exe_name"|awk '{print $1}'`
 [[ -n $pid ]] && { echo "Kill $pid"; kill $pid; }
 
 cargo fmt
-cargo clippy --color=always -- -D warnings 2>&1 | scan_error_first_40_lines | tee error.txt
+cargo clippy --color=always -- -D warnings 2>&1 | scan_error_code_first_40_lines | tee error.txt
 r=$?
 error_to_clipboard clippy
 [[ "$r" -ne 0 ]] && wait_and_run
 
-cargo clippy --tests -- -D warnings 2>&1 | scan_error_first_40_lines | tee error.txt
+cargo clippy --tests -- -D warnings 2>&1 | scan_error_code_first_40_lines | tee error.txt
 r=$?
 error_to_clipboard clippy_tests
 [[ "$r" -ne 0 ]] && wait_and_run
 
 
 [[ -f .env ]] && source .env
-cargo test --workspace --color=always -- --nocapture 2>&1 | scan_error_first_40_lines | tee error.txt
+cargo test --workspace --color=always -- --nocapture 2>&1 | scan_error_test_last_40_lines | tee error.txt
 r=$?
 echo one
 [[ "$r" -ne 0 ]] && wait_and_run

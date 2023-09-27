@@ -40,6 +40,31 @@ pub struct Text<'a> {
     pub scroll_pos_y: i32,
 }
 
+impl Default for Text<'_> {
+    fn default() -> Self {
+        let shader_file = "../resources/color_bold.frag";
+        let shader = Shader::from_file(shader_file, ShaderType::Fragment).unwrap();
+
+        Self {
+            text: vec![String::new()],
+            position: Vector2i::new(0, 0),
+            vertical_alignment: VerticalAlignment::AlwaysTop,
+            texture: RenderTexture::new(1, 1).unwrap(),
+            font_scale: 1,
+            fg_color: Color::BLACK,
+            bg_color: Color::WHITE,
+            cursor_insert_color: Color::BLACK,
+            cursor_normal_color: Color::BLACK,
+            bold: false,
+            redraw: true,
+            shader,
+            cursor_state: CursorState::NormalActive,
+            cursor_position: Vector2i::new(0, 0),
+            scroll_pos_y: 0,
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 impl<'a> Text<'a> {
     pub fn new(
@@ -102,14 +127,22 @@ impl<'a> Text<'a> {
     }
 
     pub fn write(&mut self, text: &str) {
-        let mut line = if self.text.is_empty() {
-            String::new()
+        let line = if self.text.is_empty() {
+            ""
         } else {
-            self.text.pop().unwrap()
+            &self.text[self.cursor_position.y as usize]
         };
+
+        let old_cursor_y = self.cursor_position.y;
+
+        let line_left = &line[..self.cursor_position.x as usize];
+        let line_right = &line[self.cursor_position.x as usize..];
+        let mut line = line_left.chars().collect::<String>();
+        let mut lines_to_insert = Vec::new();
+
         for c in text.chars() {
             if c == '\n' {
-                self.text.push(line);
+                lines_to_insert.push(line);
                 line = String::new();
                 self.cursor_position.x = 0;
                 self.cursor_position.y += 1;
@@ -118,7 +151,18 @@ impl<'a> Text<'a> {
                 self.cursor_position.x += 1;
             }
         }
-        self.text.push(line);
+        line.push_str(line_right);
+        lines_to_insert.push(line);
+
+        if self.text.is_empty() {
+            self.text = lines_to_insert;
+        } else {
+            self.text.remove(old_cursor_y as usize);
+            self.text.splice(
+                old_cursor_y as usize..old_cursor_y as usize,
+                lines_to_insert,
+            );
+        }
         self.redraw = true;
     }
 
@@ -359,5 +403,71 @@ impl<'a> Text<'a> {
         ));
 
         window.draw(&sprite);
+    }
+
+    pub fn move_cursor_horz(&mut self, dir: i32) {
+        match dir {
+            -1 => self.cursor_position.x -= 1,
+            1 => self.cursor_position.x += 1,
+            -2 => self.cursor_position.x = 0,
+            2 => {
+                self.cursor_position.x =
+                    self.text[self.cursor_position.y as usize].chars().count() as i32
+            }
+            _ => panic!("Invalid direction"),
+        }
+        self.redraw = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_write() {
+        let mut text = Text::default();
+        text.write("Hello World");
+        assert_eq!(text.text, vec!["Hello World"]);
+    }
+
+    #[test]
+    fn test_write_cursor1() {
+        let mut text = Text::default();
+        text.write("World");
+        text.move_cursor_horz(-2);
+        text.write("Hello ");
+        assert_eq!(text.text, vec!["Hello World"]);
+        assert_eq!(text.cursor_position, Vector2i::new(6, 0));
+    }
+
+    #[test]
+    fn test_write_cursor2() {
+        let mut text = Text::default();
+        text.write("Hello\nWorld\n");
+        assert_eq!(text.text, vec!["Hello", "World", ""]);
+    }
+
+    #[test]
+    fn test_write_cursor3() {
+        let mut text = Text::default();
+        text.write("Line 1\nLine 2\nLine 3");
+        text.cursor_position = Vector2i::new(0, 1);
+        text.write("Line 2.5\n");
+        assert_eq!(text.text, vec!["Line 1", "Line 2.5", "Line 2", "Line 3"]);
+        assert_eq!(text.cursor_position, Vector2i::new(0, 2));
+    }
+
+    #[test]
+    fn test_write_cursor4() {
+        let mut text = Text::default();
+        text.write("Line 1\nLine 2\nLine 3");
+        text.cursor_position = Vector2i::new(6, 1);
+        text.write(".5\nLine 2.7\nLine 2.9");
+        assert_eq!(
+            text.text,
+            vec!["Line 1", "Line 2.5", "Line 2.7", "Line 2.9", "Line 3"]
+        );
+        assert_eq!(text.cursor_position, Vector2i::new(8, 3));
     }
 }

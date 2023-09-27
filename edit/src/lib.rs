@@ -118,6 +118,10 @@ impl Edit<'_> {
                     Key::H => self.backspace(),
                     Key::W => self.delete_word(),
                     Key::U => self.text.clear(),
+                    Key::A => self.text.move_cursor_horz(-2),
+                    Key::B => self.text.move_cursor_horz(-1),
+                    Key::E => self.text.move_cursor_horz(2),
+                    Key::F => self.text.move_cursor_horz(1),
                     Key::LBracket | Key::J => {
                         self.set_mode(Mode::Normal);
                     }
