@@ -43,7 +43,12 @@ impl Execute {
         let tx_stderr = tx.clone();
 
         let send_stdout = move |s: String| {
-            tx_stdout.send(ExecMessage::StdOut(s)).unwrap();
+            match tx_stdout.send(ExecMessage::StdOut(s)) {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error sending stdout: {}", e);
+                }
+            };
         };
         let send_stderr = move |s: String| {
             tx_stderr.send(ExecMessage::StdErr(s)).unwrap();
