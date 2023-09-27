@@ -28,6 +28,7 @@ pub struct App<'a> {
     window: RenderWindow,
     dir_plain: Vec<String>,
     jobs: Vec<Job>,
+    browse_job_history_idx: usize,
     tx: mpsc::Sender<ExecMessage>,
     rx: mpsc::Receiver<ExecMessage>,
     colors: color::AnsiColor,
@@ -105,7 +106,7 @@ impl App<'_> {
             text::CursorState::Hidden,
         );
 
-        let command = edit::Edit::new(
+        let mut command = edit::Edit::new(
             Vector2i::new(0, window_height - font_height),
             Vector2i::new(window_width, font_height),
             text::VerticalAlignment::AlwaysTop,
@@ -114,6 +115,7 @@ impl App<'_> {
             Color::BLACK,
             false,
         );
+        command.set_cursor_colors(Color::WHITE, yellow);
 
         let (tx, rx) = mpsc::channel();
         let mut app = Self {
@@ -126,6 +128,7 @@ impl App<'_> {
             window,
             dir_plain: Vec::new(),
             jobs: Vec::new(),
+            browse_job_history_idx: 0,
             tx,
             rx,
             colors,
@@ -172,10 +175,13 @@ impl App<'_> {
     }
 
     fn set_active(&mut self, active: bool) {
-        self.command.set_cursor_state(if active {
-            text::CursorState::Active
-        } else {
-            text::CursorState::Inactive
+        let old_state = self.command.get_cursor_state();
+        self.command.set_cursor_state(match (old_state, active) {
+            (text::CursorState::NormalActive, false) => text::CursorState::NormalInactive,
+            (text::CursorState::NormalInactive, true) => text::CursorState::NormalActive,
+            (text::CursorState::InsertActive, false) => text::CursorState::InsertInactive,
+            (text::CursorState::InsertInactive, true) => text::CursorState::InsertActive,
+            (state, _) => state,
         });
     }
 
@@ -216,6 +222,14 @@ impl App<'_> {
     }
 
     fn key_pressed(&mut self, code: Key) {
+        if self.command.mode == edit::Mode::Normal {
+            self.normal_mode_key_pressed(code);
+        } else {
+            self.insert_mode_key_pressed(code);
+        }
+    }
+
+    fn insert_mode_key_pressed(&mut self, code: Key) {
         match code {
             Key::Escape => self.window.close(),
             Key::Enter => self.run_command(),
@@ -223,6 +237,51 @@ impl App<'_> {
             Key::Down => self.scroll(ScrollType::CursorDown),
             Key::PageUp => self.scroll(ScrollType::PageUp),
             Key::PageDown => self.scroll(ScrollType::PageDown),
+            _ => self.command.key_pressed(code),
+        }
+    }
+
+    fn normal_mode_key_pressed(&mut self, code: Key) {
+        let old_idx = self.browse_job_history_idx as i32;
+        let old_command = self.command.get_text()[0].clone();
+        let mut update_job_idx = |delta: i32| {
+            if self.jobs.is_empty() {
+                return;
+            }
+            if old_command.is_empty() {
+                self.command
+                    .replace(vec![self.jobs[old_idx as usize].args_printable()]);
+                return;
+            }
+            let job_count = self.jobs.len() as i32;
+            let mut idx = old_idx + delta;
+            if idx < 0 {
+                idx = 0;
+            } else if idx >= job_count {
+                idx = job_count - 1;
+            }
+            let mut new_command;
+            loop {
+                self.browse_job_history_idx = idx.min(job_count - 1).max(0) as usize;
+                new_command = self.jobs[self.browse_job_history_idx].args_printable();
+                if new_command.as_str() != old_command.as_str()
+                    || (idx == 0 || idx == job_count - 1)
+                {
+                    break;
+                }
+                idx += delta;
+            }
+            self.command.replace(vec![new_command]);
+        };
+
+        match code {
+            Key::Enter => {
+                self.run_command();
+                self.command.set_mode(edit::Mode::Insert);
+            }
+            Key::Escape => self.window.close(),
+            Key::K => update_job_idx(-1),
+            Key::J => update_job_idx(1),
             _ => self.command.key_pressed(code),
         }
     }
@@ -256,7 +315,7 @@ impl App<'_> {
         let pwd = std::env::current_dir().unwrap();
         let text = if let Some(job) = self.jobs.last() {
             let return_code = job.return_code.unwrap_or(0);
-            let command = job.args.join(" ");
+            let command = job.args_printable();
             format!("{} ({}) {}", pwd.display(), return_code, command)
         } else {
             format!("{}", pwd.display())
@@ -309,16 +368,21 @@ impl App<'_> {
                 }
             }
 
+            let job = Job::new(expanded_args);
+
+            let job_id = self.jobs.len();
+            self.browse_job_history_idx = job_id;
+
             self.main_text.write(&format!(
-                "{}{}{}> {}{}\n",
+                "{}{}{} {}> {}{}\n",
                 self.colors.bg("Yellow"),
                 self.colors.fg("Black"),
+                job_id,
                 pwd.display(),
-                expanded_args.join(" "),
+                job.args_printable(),
                 self.colors.reset()
             ));
 
-            let job = Job::new(expanded_args);
             BuiltIn::run(self.tx.clone(), job);
         }
     }

@@ -21,4 +21,4 @@ To do
     - settings for loading and saving aliases?
 - variable expansion
 - load and save and edit text
-- replace "\x1b[{}m", colors.get_ansi("Black").unwrap() with colors.fg("Black")
+- change cursor in insert/normal mode

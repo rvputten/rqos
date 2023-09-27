@@ -1,6 +1,3 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
-
 use glsl::{Vec2, Vec4};
 use sfml::graphics::{
     glsl, Color, RenderStates, RenderTarget, RenderTexture, RenderWindow, Shader, ShaderType,
@@ -10,21 +7,13 @@ use sfml::system::{Vector2f, Vector2i};
 
 use color::ColorType;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum CursorState {
     Hidden,
-    Active,
-    Inactive,
-}
-
-impl Display for CursorState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CursorState::Hidden => write!(f, "Hidden"),
-            CursorState::Active => write!(f, "Active"),
-            CursorState::Inactive => write!(f, "Inactive"),
-        }
-    }
+    NormalActive,
+    NormalInactive,
+    InsertActive,
+    InsertInactive,
 }
 
 pub enum VerticalAlignment {
@@ -41,6 +30,8 @@ pub struct Text<'a> {
     font_scale: i32,
     fg_color: Color,
     bg_color: Color,
+    cursor_insert_color: Color,
+    cursor_normal_color: Color,
     bold: bool,
     pub redraw: bool,
     shader: Shader<'a>,
@@ -72,6 +63,8 @@ impl<'a> Text<'a> {
             font_scale,
             fg_color,
             bg_color,
+            cursor_insert_color: fg_color,
+            cursor_normal_color: fg_color,
             bold,
             redraw: true,
             shader,
@@ -95,6 +88,16 @@ impl<'a> Text<'a> {
 
     pub fn set_cursor_state(&mut self, cursor_state: CursorState) {
         self.cursor_state = cursor_state;
+        self.redraw = true;
+    }
+
+    pub fn get_cursor_state(&self) -> CursorState {
+        self.cursor_state
+    }
+
+    pub fn set_cursor_colors(&mut self, insert: Color, normal: Color) {
+        self.cursor_insert_color = insert;
+        self.cursor_normal_color = normal;
         self.redraw = true;
     }
 
@@ -136,6 +139,10 @@ impl<'a> Text<'a> {
         }
         self.cursor_position.y = self.text.len() as i32 - 1;
         self.cursor_position.x = self.text[self.cursor_position.y as usize].len() as i32;
+        println!(
+            "text replaced: {:?}, cursor: {}/{}",
+            self.text, self.cursor_position.x, self.cursor_position.y
+        );
         self.redraw = true;
         old_text
     }
@@ -287,37 +294,7 @@ impl<'a> Text<'a> {
         }
     }
 
-    fn draw_cursor_active(&mut self, font: &font::Font, start_y: i32) {
-        let font_width = font.char_size.x * self.font_scale;
-        let font_height = font.char_size.y * self.font_scale;
-
-        self.shader
-            .set_uniform_vec4("fg_color", Vec4::from(self.bg_color));
-        self.shader
-            .set_uniform_vec4("bg_color", Vec4::from(self.fg_color));
-        self.shader
-            .set_uniform_float("bold_offset", if self.bold { 1.0 } else { 0.0 });
-
-        let mut states_bg_fg = RenderStates::default();
-        states_bg_fg.set_shader(Some(&self.shader));
-
-        let ch = self.text[self.cursor_position.y as usize]
-            .chars()
-            .nth(self.cursor_position.x as usize)
-            .unwrap_or(' ');
-        let mut sprite = font.get_sprite(ch as i32);
-        sprite.set_position(Vector2f::new(
-            (self.cursor_position.x * font_width) as f32,
-            (start_y + self.cursor_position.y * font_height) as f32,
-        ));
-        sprite.set_scale(Vector2f::new(
-            self.font_scale as f32,
-            self.font_scale as f32,
-        ));
-        self.texture.draw_with_renderstates(&sprite, &states_bg_fg);
-    }
-
-    fn draw_cursor_inactive(&mut self, font: &font::Font, start_y: i32) {
+    fn draw_cursor(&mut self, font: &font::Font, start_y: i32) {
         let font_width = font.char_size.x * self.font_scale;
         let font_height = font.char_size.y * self.font_scale;
         //let stroke_width = if font_width > 10 { 2.0 } else { 1.0 };
@@ -331,7 +308,20 @@ impl<'a> Text<'a> {
             }
         };
 
-        let fg = mix(Vec4::from(self.fg_color), Vec4::from(self.bg_color));
+        let fg = match self.cursor_state {
+            CursorState::NormalActive => Vec4::from(self.cursor_normal_color),
+            CursorState::NormalInactive => mix(
+                Vec4::from(self.cursor_normal_color),
+                Vec4::from(self.bg_color),
+            ),
+            CursorState::InsertActive => Vec4::from(self.cursor_insert_color),
+            CursorState::InsertInactive => {
+                mix(Vec4::from(self.fg_color), Vec4::from(self.bg_color))
+            }
+            CursorState::Hidden => return,
+        };
+
+        println!("fg: {:?}, cursor_state: {}", fg, self.cursor_state as usize);
 
         self.shader.set_uniform_vec4("bg_color", fg);
         self.shader
@@ -364,11 +354,7 @@ impl<'a> Text<'a> {
 
             let (text_end, partially_skipped_lines, start_y) = self.calculate_scroll_position(font);
             self.draw_text(font, text_end, partially_skipped_lines, start_y);
-            match self.cursor_state {
-                CursorState::Active => self.draw_cursor_active(font, start_y),
-                CursorState::Inactive => self.draw_cursor_inactive(font, start_y),
-                CursorState::Hidden => {}
-            }
+            self.draw_cursor(font, start_y);
         }
         self.texture.display();
 

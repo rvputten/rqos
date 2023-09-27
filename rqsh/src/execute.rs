@@ -20,6 +20,19 @@ impl Job {
         }
     }
 
+    pub fn args_printable(&self) -> String {
+        let mut s = String::new();
+        for arg in &self.args {
+            if arg.contains(' ') {
+                s.push_str(&format!("\"{}\" ", arg));
+            } else {
+                s.push_str(&format!("{} ", arg));
+            }
+        }
+        s.pop();
+        s
+    }
+
     pub fn start(&mut self) {
         self.start_time = Some(std::time::SystemTime::now());
     }

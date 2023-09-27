@@ -5,16 +5,21 @@ use sfml::window::Key;
 use text::Text;
 
 // Definitions in: sfml/rust-sfml/src/ffi/window.rs
-const KEYMAP_NOSHIFT: &str = "abcdefghijklmnopqrstuvwxyz01234567890";
-const KEYMAP_SHIFT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ)!@#$%^&*(";
+const KEYMAP_NOSHIFT: &str = "abcdefghijklmnopqrstuvwxyz01234567890.........[];,.'/\\`=- ";
+const KEYMAP_SHIFT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ)!@#$%^&*(..........{}:<>\"?|~+_ ";
 // LBracket, RBracket, Semicolon, Comma, Period, Quote, Slash, Backslash, Tilde, Equal, Hyphen, Space,
-const KEYMAP_SPECIAL_NOSHIFT: &str = "[];,.'/\\`=- ";
-const KEYMAP_SPECIAL_SHIFT: &str = "{}:<>\"?|~+_ ";
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum Mode {
+    Normal,
+    Insert,
+}
 
 pub struct Edit<'a> {
     text: Text<'a>,
     shift: bool,
     control: bool,
+    pub mode: Mode,
 }
 
 impl Edit<'_> {
@@ -27,7 +32,7 @@ impl Edit<'_> {
         bg_color: Color,
         bold: bool,
     ) -> Self {
-        let cursor_state = text::CursorState::Active;
+        let cursor_state = text::CursorState::InsertActive;
         Self {
             text: Text::new(
                 position,
@@ -41,11 +46,20 @@ impl Edit<'_> {
             ),
             shift: false,
             control: false,
+            mode: Mode::Insert,
         }
     }
 
     pub fn set_cursor_state(&mut self, cursor_state: text::CursorState) {
         self.text.set_cursor_state(cursor_state);
+    }
+
+    pub fn get_cursor_state(&self) -> text::CursorState {
+        self.text.get_cursor_state()
+    }
+
+    pub fn set_cursor_colors(&mut self, insert: Color, normal: Color) {
+        self.text.set_cursor_colors(insert, normal);
     }
 
     pub fn write(&mut self, text: &str) {
@@ -56,6 +70,10 @@ impl Edit<'_> {
         self.text.replace(text)
     }
 
+    pub fn get_text(&self) -> Vec<String> {
+        self.text.get_text()
+    }
+
     pub fn draw(&mut self, window: &mut RenderWindow, font: &font::Font) {
         self.text.draw(window, font);
     }
@@ -64,31 +82,58 @@ impl Edit<'_> {
         self.text.set_position_size(position, size);
     }
 
+    pub fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        let old_state = self.text.get_cursor_state();
+        let new_state = match (old_state, mode) {
+            (text::CursorState::InsertActive, Mode::Normal) => text::CursorState::NormalActive,
+            (text::CursorState::InsertInactive, Mode::Normal) => text::CursorState::NormalInactive,
+            (text::CursorState::NormalActive, Mode::Insert) => text::CursorState::InsertActive,
+            (text::CursorState::NormalInactive, Mode::Insert) => text::CursorState::InsertInactive,
+            _ => old_state,
+        };
+        self.text.set_cursor_state(new_state);
+    }
+
     pub fn key_pressed(&mut self, code: Key) {
         // Note: I know sf::Event::TextEntered exists, but so does xterm.
         let ucode = code as usize;
-        let start_abc = Key::A as usize;
-        let end_abc = Key::Num9 as usize;
+        let start_alphanum = Key::A as usize;
+        let end_alphanum = Key::Num9 as usize;
         let start_special = Key::LBracket as usize;
         let end_special = Key::Space as usize;
-        if ucode >= start_abc && ucode <= end_abc {
-            if self.shift {
-                self.write(&KEYMAP_SHIFT[ucode..ucode + 1]);
-            } else if self.control {
-                match code {
+
+        if (ucode >= start_alphanum && ucode <= end_alphanum)
+            || (ucode >= start_special && ucode <= end_special)
+        {
+            let mode = self.mode;
+            const S_DN: bool = true;
+            const S_UP: bool = false;
+            const C_DN: bool = true;
+            const C_UP: bool = false;
+            match (mode, self.shift, self.control) {
+                (Mode::Insert, S_UP, C_UP) => self.write(&KEYMAP_NOSHIFT[ucode..ucode + 1]),
+                (Mode::Insert, S_DN, C_UP) => self.write(&KEYMAP_SHIFT[ucode..ucode + 1]),
+                (Mode::Insert, S_UP, C_DN) => match code {
                     Key::H => self.backspace(),
                     Key::U => self.text.clear(),
+                    Key::LBracket | Key::J => {
+                        self.set_mode(Mode::Normal);
+                        println!("Mode: Normal");
+                    }
                     _ => {}
+                },
+                (Mode::Insert, S_DN, C_DN) => {}
+                // normal mode
+                (Mode::Normal, S_UP, C_UP) => {
+                    if ucode == Key::I as usize || ucode == Key::A as usize {
+                        self.set_mode(Mode::Insert);
+                        println!("Mode: Insert");
+                    }
                 }
-            } else {
-                self.write(&KEYMAP_NOSHIFT[ucode..ucode + 1]);
-            }
-        } else if ucode >= start_special && ucode <= end_special {
-            let idx = ucode - start_special;
-            if self.shift {
-                self.write(&KEYMAP_SPECIAL_SHIFT[idx..idx + 1]);
-            } else {
-                self.write(&KEYMAP_SPECIAL_NOSHIFT[idx..idx + 1]);
+                (Mode::Normal, S_DN, C_UP) => {}
+                (Mode::Normal, S_UP, C_DN) => {}
+                (Mode::Normal, S_DN, C_DN) => {}
             }
         } else {
             match code {
