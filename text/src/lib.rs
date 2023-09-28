@@ -22,6 +22,133 @@ pub enum VerticalAlignment {
     BottomOnOverflow,
 }
 
+pub struct TextBuilder {
+    position: Option<Vector2i>,
+    size: Option<Vector2i>,
+    vertical_alignment: Option<VerticalAlignment>,
+    font_scale: Option<i32>,
+    fg_color: Option<Color>,
+    bg_color: Option<Color>,
+    cursor_insert_color: Option<Color>,
+    cursor_normal_color: Option<Color>,
+    bold: Option<bool>,
+    cursor_state: Option<CursorState>,
+}
+
+impl TextBuilder {
+    pub fn new() -> Self {
+        Self {
+            position: None,
+            size: None,
+            vertical_alignment: None,
+            font_scale: None,
+            fg_color: None,
+            bg_color: None,
+            cursor_insert_color: None,
+            cursor_normal_color: None,
+            bold: None,
+            cursor_state: None,
+        }
+    }
+
+    pub fn position(mut self, position: Vector2i) -> Self {
+        self.position = Some(position);
+        self
+    }
+
+    pub fn size(mut self, size: Vector2i) -> Self {
+        self.size = Some(size);
+        self
+    }
+
+    pub fn vertical_alignment(mut self, vertical_alignment: VerticalAlignment) -> Self {
+        self.vertical_alignment = Some(vertical_alignment);
+        self
+    }
+
+    pub fn font_scale(mut self, font_scale: i32) -> Self {
+        self.font_scale = Some(font_scale);
+        self
+    }
+
+    pub fn fg_color(mut self, fg_color: Color) -> Self {
+        self.fg_color = Some(fg_color);
+        self
+    }
+
+    pub fn bg_color(mut self, bg_color: Color) -> Self {
+        self.bg_color = Some(bg_color);
+        self
+    }
+
+    pub fn cursor_insert_color(mut self, cursor_insert_color: Color) -> Self {
+        self.cursor_insert_color = Some(cursor_insert_color);
+        self
+    }
+
+    pub fn cursor_normal_color(mut self, cursor_normal_color: Color) -> Self {
+        self.cursor_normal_color = Some(cursor_normal_color);
+        self
+    }
+
+    pub fn bold(mut self, bold: bool) -> Self {
+        self.bold = Some(bold);
+        self
+    }
+
+    pub fn cursor_state(mut self, cursor_state: CursorState) -> Self {
+        self.cursor_state = Some(cursor_state);
+        self
+    }
+
+    pub fn build(self) -> Text<'static> {
+        let position = self.position.unwrap_or(Vector2i::new(0, 0));
+        let size = self.size.unwrap_or(Vector2i::new(0, 0));
+        let vertical_alignment = self
+            .vertical_alignment
+            .unwrap_or(VerticalAlignment::AlwaysTop);
+        let font_scale = self.font_scale.unwrap_or(1);
+        let fg_color = self.fg_color.unwrap_or(Color::BLACK);
+        let bg_color = self.bg_color.unwrap_or(Color::WHITE);
+        let cursor_insert_color = self.cursor_insert_color.unwrap_or(fg_color);
+        let cursor_normal_color = self.cursor_normal_color.unwrap_or(Color::BLACK);
+        let bold = self.bold.unwrap_or(false);
+        let cursor_state = self.cursor_state.unwrap_or(CursorState::Hidden);
+
+        let shader = if let Ok(shader) =
+            Shader::from_file("resources/color_bold.frag", ShaderType::Fragment)
+        {
+            shader
+        } else {
+            Shader::from_file("../resources/color_bold.frag", ShaderType::Fragment).unwrap()
+        };
+
+        Text {
+            text: vec![String::new()],
+            position,
+            vertical_alignment,
+            texture: RenderTexture::new(size.x as u32, size.y as u32).unwrap(),
+            font_scale,
+            fg_color,
+            bg_color,
+            cursor_insert_color,
+            cursor_normal_color,
+            bold,
+            redraw: true,
+            shader,
+            cursor_state,
+            cursor_position: Vector2i::new(0, 0),
+            scroll_pos_y: 0,
+        }
+    }
+}
+
+impl Default for TextBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Text<'a> {
     pub text: Vec<String>,
     position: Vector2i,
@@ -41,89 +168,72 @@ pub struct Text<'a> {
 }
 
 impl Default for Text<'_> {
-    fn default() -> Self {
-        let shader_file = "../resources/color_bold.frag";
-        let shader = Shader::from_file(shader_file, ShaderType::Fragment).unwrap();
-
-        Self {
-            text: vec![String::new()],
-            position: Vector2i::new(0, 0),
-            vertical_alignment: VerticalAlignment::AlwaysTop,
-            texture: RenderTexture::new(1, 1).unwrap(),
-            font_scale: 1,
-            fg_color: Color::BLACK,
-            bg_color: Color::WHITE,
-            cursor_insert_color: Color::BLACK,
-            cursor_normal_color: Color::BLACK,
-            bold: false,
-            redraw: true,
-            shader,
-            cursor_state: CursorState::NormalActive,
-            cursor_position: Vector2i::new(0, 0),
-            scroll_pos_y: 0,
-        }
+    fn default() -> Text<'static> {
+        TextBuilder::new().build()
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 impl<'a> Text<'a> {
-    pub fn new(
-        position: Vector2i,
-        size: Vector2i,
-        vertical_alignment: VerticalAlignment,
-        font_scale: i32,
-        fg_color: Color,
-        bg_color: Color,
-        bold: bool,
-        cursor_state: CursorState,
-    ) -> Self {
-        let shader_file = "resources/color_bold.frag";
-        let shader = Shader::from_file(shader_file, ShaderType::Fragment).unwrap();
-
-        Self {
-            text: vec![String::new()],
-            position,
-            vertical_alignment,
-            texture: RenderTexture::new(size.x as u32, size.y as u32).unwrap(),
-            font_scale,
-            fg_color,
-            bg_color,
-            cursor_insert_color: fg_color,
-            cursor_normal_color: fg_color,
-            bold,
-            redraw: true,
-            shader,
-            cursor_state,
-            cursor_position: Vector2i::new(0, 0),
-            scroll_pos_y: 0,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn set_position_size(&mut self, position: Vector2i, size: Vector2i) {
+    pub fn position_size(&mut self, position: Vector2i, size: Vector2i) -> &mut Self {
         let size_x = if size.x < 1 { 1 } else { size.x };
         let size_y = if size.y < 1 { 1 } else { size.y };
         self.position = position;
         self.texture = RenderTexture::new(size_x as u32, size_y as u32).unwrap();
+        self
+    }
+
+    pub fn set_position_size(&mut self, position: Vector2i, size: Vector2i) {
+        self.position_size(position, size);
         self.redraw = true;
     }
 
-    pub fn get_size(&self) -> Vector2i {
-        Vector2i::new(self.texture.size().x as i32, self.texture.size().y as i32)
+    pub fn cursor_state(&mut self, cursor_state: CursorState) -> &mut Self {
+        self.cursor_state = cursor_state;
+        self
     }
 
     pub fn set_cursor_state(&mut self, cursor_state: CursorState) {
-        self.cursor_state = cursor_state;
+        self.cursor_state(cursor_state);
         self.redraw = true;
+    }
+
+    pub fn cursor_colors(&mut self, insert: Color, normal: Color) -> &mut Self {
+        self.cursor_insert_color = insert;
+        self.cursor_normal_color = normal;
+        self
+    }
+
+    pub fn set_cursor_colors(&mut self, insert: Color, normal: Color) {
+        self.cursor_colors(insert, normal);
+        self.redraw = true;
+    }
+
+    pub fn vertical_alignment(&mut self, vertical_alignment: VerticalAlignment) -> &mut Self {
+        self.vertical_alignment = vertical_alignment;
+        self
+    }
+
+    pub fn foreground_color(&mut self, color: Color) -> &mut Self {
+        self.fg_color = color;
+        self
+    }
+
+    pub fn background_color(&mut self, color: Color) -> &mut Self {
+        self.bg_color = color;
+        self
     }
 
     pub fn get_cursor_state(&self) -> CursorState {
         self.cursor_state
     }
 
-    pub fn set_cursor_colors(&mut self, insert: Color, normal: Color) {
-        self.cursor_insert_color = insert;
-        self.cursor_normal_color = normal;
-        self.redraw = true;
+    pub fn get_size(&self) -> Vector2i {
+        Vector2i::new(self.texture.size().x as i32, self.texture.size().y as i32)
     }
 
     pub fn write(&mut self, text: &str) {

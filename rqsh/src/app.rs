@@ -24,7 +24,7 @@ pub struct App<'a> {
     main_text: text::Text<'a>,
     directory: text::Text<'a>,
     status_line: text::Text<'a>,
-    command: edit::Edit<'a>,
+    command: edit::Edit,
     window: RenderWindow,
     dir_plain: Vec<String>,
     jobs: Vec<Job>,
@@ -68,54 +68,38 @@ impl App<'_> {
 
         let colors = color::AnsiColor::new();
         let yellow = colors.get_color("Yellow").unwrap();
-        let light_blue = colors.get_color("Light Blue").unwrap();
+        let blue = colors.get_color("Blue").unwrap();
 
-        let main_text = text::Text::new(
-            Vector2i::new(0, 0),
-            Vector2i::new(
+        let main_text = text::TextBuilder::new()
+            .position(Vector2i::new(0, 0))
+            .size(Vector2i::new(
                 window_width - dir_window_width,
                 window_height - font_height * 2,
-            ),
-            text::VerticalAlignment::AlwaysBottom,
-            font_scale,
-            Color::WHITE,
-            Color::BLACK,
-            false,
-            text::CursorState::Hidden,
-        );
+            ))
+            .vertical_alignment(text::VerticalAlignment::AlwaysBottom)
+            .build();
 
-        let directory = text::Text::new(
-            Vector2i::new(window_width - dir_window_width, 0),
-            Vector2i::new(dir_window_width, window_height - font_height * 2),
-            text::VerticalAlignment::AlwaysBottom,
-            font_scale,
-            light_blue,
-            Color::BLACK,
-            false,
-            text::CursorState::Hidden,
-        );
+        let directory = text::TextBuilder::new()
+            .position(Vector2i::new(window_width - dir_window_width, 0))
+            .size(Vector2i::new(
+                dir_window_width,
+                window_height - font_height * 2,
+            ))
+            .vertical_alignment(text::VerticalAlignment::AlwaysBottom)
+            .bg_color(Color::WHITE)
+            .fg_color(blue)
+            .build();
 
-        let status_line = text::Text::new(
-            Vector2i::new(0, window_height - font_height * 2),
-            Vector2i::new(window_width, font_height),
-            text::VerticalAlignment::AlwaysTop,
-            font_scale,
-            Color::BLACK,
-            yellow,
-            false,
-            text::CursorState::Hidden,
-        );
+        let status_line = text::TextBuilder::new()
+            .position(Vector2i::new(0, window_height - font_height * 2))
+            .size(Vector2i::new(window_width, font_height))
+            .fg_color(Color::BLACK)
+            .bg_color(yellow)
+            .build();
 
-        let mut command = edit::Edit::new(
-            Vector2i::new(0, window_height - font_height),
-            Vector2i::new(window_width, font_height),
-            text::VerticalAlignment::AlwaysTop,
-            font_scale,
-            Color::WHITE,
-            Color::BLACK,
-            false,
-        );
-        command.set_cursor_colors(Color::WHITE, yellow);
+        let command = edit::EditBuilder::new()
+            .cursor_colors(Color::BLACK, yellow)
+            .build();
 
         let (tx, rx) = mpsc::channel();
         let mut app = Self {

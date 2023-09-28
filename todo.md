@@ -25,4 +25,4 @@ To do
 - insert mode commands
   - Ctrl-W in insert mode
   - Ctrl-A+E in insert mode
-
+- builder pattern for text and edit

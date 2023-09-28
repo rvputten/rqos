@@ -15,39 +15,65 @@ pub enum Mode {
     Insert,
 }
 
-pub struct Edit<'a> {
-    text: Text<'a>,
+pub struct EditBuilder {
+    cursor_colors: Option<(Color, Color)>,
+    cursor_state: Option<text::CursorState>,
+}
+
+impl EditBuilder {
+    pub fn new() -> Self {
+        Self {
+            cursor_colors: None,
+            cursor_state: None,
+        }
+    }
+
+    pub fn cursor_colors(mut self, insert: Color, normal: Color) -> Self {
+        self.cursor_colors = Some((insert, normal));
+        self
+    }
+
+    pub fn cursor_state(mut self, cursor_state: text::CursorState) -> Self {
+        self.cursor_state = Some(cursor_state);
+        self
+    }
+
+    pub fn build(&self) -> Edit {
+        let mut edit = Edit {
+            text: Text::new(),
+            shift: false,
+            control: false,
+            mode: Mode::Insert,
+        };
+        if let Some((insert, normal)) = self.cursor_colors {
+            edit.cursor_colors(insert, normal);
+        }
+        if let Some(cursor_state) = self.cursor_state {
+            edit.set_cursor_state(cursor_state);
+        } else {
+            edit.set_cursor_state(text::CursorState::InsertActive);
+        }
+        edit
+    }
+}
+
+impl Default for EditBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct Edit {
+    text: Text<'static>,
     shift: bool,
     control: bool,
     pub mode: Mode,
 }
 
-impl Edit<'_> {
-    pub fn new(
-        position: Vector2i,
-        size: Vector2i,
-        vertical_alignment: text::VerticalAlignment,
-        font_scale: i32,
-        fg_color: Color,
-        bg_color: Color,
-        bold: bool,
-    ) -> Self {
-        let cursor_state = text::CursorState::InsertActive;
-        Self {
-            text: Text::new(
-                position,
-                size,
-                vertical_alignment,
-                font_scale,
-                fg_color,
-                bg_color,
-                bold,
-                cursor_state,
-            ),
-            shift: false,
-            control: false,
-            mode: Mode::Insert,
-        }
+impl Edit {
+    pub fn cursor_state(&mut self, cursor_state: text::CursorState) -> &mut Self {
+        self.text.set_cursor_state(cursor_state);
+        self
     }
 
     pub fn set_cursor_state(&mut self, cursor_state: text::CursorState) {
@@ -56,6 +82,11 @@ impl Edit<'_> {
 
     pub fn get_cursor_state(&self) -> text::CursorState {
         self.text.get_cursor_state()
+    }
+
+    pub fn cursor_colors(&mut self, insert: Color, normal: Color) -> &mut Self {
+        self.text.set_cursor_colors(insert, normal);
+        self
     }
 
     pub fn set_cursor_colors(&mut self, insert: Color, normal: Color) {
