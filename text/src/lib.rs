@@ -103,7 +103,7 @@ impl TextBuilder {
 
     pub fn build(self) -> Text<'static> {
         let position = self.position.unwrap_or(Vector2i::new(0, 0));
-        let size = self.size.unwrap_or(Vector2i::new(0, 0));
+        let size = self.size.unwrap_or(Vector2i::new(1, 1));
         let vertical_alignment = self
             .vertical_alignment
             .unwrap_or(VerticalAlignment::AlwaysTop);

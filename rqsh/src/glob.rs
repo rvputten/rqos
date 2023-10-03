@@ -1,10 +1,30 @@
 pub struct Glob {
     source: Vec<String>,
+    parent: String,
 }
 
 impl Glob {
-    pub fn from_vec_string(source: Vec<String>) -> Self {
-        Self { source }
+    pub fn from_vec_string(source: Vec<String>, parent: &str) -> Self {
+        Self {
+            source,
+            parent: parent.to_string(),
+        }
+    }
+
+    pub fn from_path(path: &str) -> Result<Self, std::io::Error> {
+        let mut source = Vec::new();
+        for entry in std::fs::read_dir(path)? {
+            let entry = entry?;
+            if let Ok(name) = entry.file_name().into_string() {
+                source.push(name);
+            } else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "invalid file name",
+                ));
+            }
+        }
+        Ok(Glob::from_vec_string(source, path))
     }
 
     fn matches(pattern: &str, to_match: &str) -> bool {
@@ -45,7 +65,7 @@ impl Glob {
         }
     }
 
-    pub fn glob(&self, pattern: &str) -> Vec<String> {
+    pub fn match_path_single(&self, pattern: &str) -> Vec<String> {
         let mut result = Vec::new();
         for s in &self.source {
             if Self::matches(pattern, s) {
@@ -53,6 +73,80 @@ impl Glob {
             }
         }
         result
+    }
+
+    // pattern can contain any number of '/', '?' and '*', not allowed are '[]{}"\' etc.
+    // prerequisites:
+    // - self.source contains all files and directories in the directory to be searched
+    //   - e.g. ["file1", "file2", "subdir1", "subdir2"], but not ["subdir2/file3"] during the
+    //     initial call
+    // - when called recursively by self, self.source contains deeper levels, but always the same
+    //   level
+    //   - e.g. ["subdir1/file3", "subdir2/file4", "subdir2/subsubdir1"]
+    //   - but not ["file1", "subdir2/subdir3/file5"]
+    // - pattern starts with the pattern to be matched
+    pub fn match_path_multiple(&self, pattern: &str) -> Vec<String> {
+        if let Some(stripped) = pattern.strip_prefix('/') {
+            let mut parts = stripped.splitn(2, '/');
+            let here = format!("/{}", parts.next().unwrap());
+            let glob = Glob::from_path(&here).unwrap();
+            if let Some(remaining_match_path) = parts.next() {
+                glob.match_path_multiple(remaining_match_path)
+            } else {
+                vec![here]
+            }
+        } else {
+            let mut parts = pattern.splitn(2, '/');
+            let here = parts.next().unwrap();
+            let matched_here = self.match_path_single(here);
+
+            let path_join = |s1: &str, s2: &str| {
+                if s1 == "." {
+                    s2.to_string()
+                } else {
+                    format!("{}/{}", s1, s2)
+                }
+            };
+
+            // if there is a '/' in the pattern, we need to match the rest of the pattern in the
+            // matched files
+            if let Some(remaining_match_path) = parts.next() {
+                // what we have now:
+                // - list of files and directories in the current directory that match the pattern
+                // - the rest of the pattern to be matched
+                // - in self.source, we have
+                // what we need to do:
+                // - go into the directory (if it is a directory) and match the rest of the pattern
+                //   recursively
+                let mut result = Vec::new();
+                for entry in matched_here {
+                    let path = path_join(&self.parent, &entry);
+                    let path = std::path::Path::new(&path);
+                    if path.is_dir() {
+                        let entry = path_join(&self.parent, &entry);
+                        match Glob::from_path(&entry) {
+                            Ok(glob) => {
+                                let matched = glob.match_path_multiple(remaining_match_path);
+                                for m in matched {
+                                    result.push(m);
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("error: {}", e);
+                            }
+                        };
+                    }
+                }
+                result
+            } else if self.parent == "." {
+                matched_here
+            } else {
+                matched_here
+                    .iter()
+                    .map(|s| format!("{}/{}", self.parent, s))
+                    .collect()
+            }
+        }
     }
 }
 
@@ -82,11 +176,77 @@ mod tests {
             .iter()
             .map(|s| s.to_string())
             .collect();
-        let glob = Glob::from_vec_string(strings);
+        let glob = Glob::from_vec_string(strings, ".");
         let empty: Vec<&str> = Vec::new();
-        assert_eq!(glob.glob("abc"), vec!["abc"]);
-        assert_eq!(glob.glob("abc*"), vec!["abc", "abcd", "abcde"]);
-        assert_eq!(glob.glob("abc*e"), vec!["abcde"]);
-        assert_eq!(glob.glob("abc*f"), empty);
+        assert_eq!(glob.match_path_single("abc"), vec!["abc"]);
+        assert_eq!(glob.match_path_single("abc*"), vec!["abc", "abcd", "abcde"]);
+        assert_eq!(glob.match_path_single("abc*e"), vec!["abcde"]);
+        assert_eq!(glob.match_path_single("abc*f"), empty);
+    }
+
+    fn setup_match_path_multiple() -> String {
+        // create a test dir with mktemp
+        let r = std::process::Command::new("mktemp")
+            .arg("-d")
+            .output()
+            .expect("failed to execute process");
+        let dir = String::from_utf8(r.stdout).unwrap();
+        let dir = dir.trim();
+        let new_dirs = ["/subdir1", "/subdir2", "/subdir2/subsubdir1"];
+        let new_files = [
+            "/file1",
+            "/file2",
+            "/subdir1/file3",
+            "/subdir2/file4",
+            "/subdir2/subsubdir1/file5",
+        ];
+
+        for d in &new_dirs {
+            let path = format!("{}{}", dir, d);
+            std::fs::create_dir_all(path).unwrap();
+        }
+
+        for f in &new_files {
+            let path = format!("{}{}", dir, f);
+            std::fs::File::create(path).unwrap();
+        }
+
+        dir.to_string()
+    }
+
+    fn cleanup_match_path_multiple(dir: &str) {
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn test_match_path_multiple() {
+        let dir = setup_match_path_multiple();
+        // go to directory
+        let _ = std::env::set_current_dir(&dir);
+        let glob = Glob::from_path(".").unwrap();
+        let empty: Vec<&str> = Vec::new();
+        let assert_sorted = |pattern: &str, expected: Vec<&str>| {
+            let mut result = glob.match_path_multiple(pattern);
+            result.sort();
+            println!("actual  : {:?}", result);
+            println!("expected: {:?}", expected);
+            assert_eq!(result, expected);
+        };
+
+        assert_sorted("file*", vec!["file1", "file2"]);
+        assert_sorted("subdir*", vec!["subdir1", "subdir2"]);
+        assert_sorted("subdir1/*", vec!["subdir1/file3"]);
+        assert_sorted("subdir?/f*", vec!["subdir1/file3", "subdir2/file4"]);
+        assert_sorted("subdir2/*", vec!["subdir2/file4", "subdir2/subsubdir1"]);
+        assert_sorted("subdir2/subsubdir1/*", vec!["subdir2/subsubdir1/file5"]);
+        assert_sorted("subdir2/subsubdir1/file5", vec!["subdir2/subsubdir1/file5"]);
+        assert_sorted("subdir2/subsubdir1/file6", empty);
+        assert_sorted("/tmp", vec!["/tmp"]);
+        assert_sorted(&dir, vec![&dir]);
+        assert_sorted(
+            &format!("{}/subdir*", dir),
+            vec![&format!("{}/subdir1", dir), &format!("{}/subdir2", dir)],
+        );
+        cleanup_match_path_multiple(&dir);
     }
 }

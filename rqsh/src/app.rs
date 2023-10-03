@@ -335,14 +335,14 @@ impl App<'_> {
         if !command.is_empty() && !command[0].trim().is_empty() {
             // Expand glob patterns
             let args = Args::new(&command[0]).args;
-            let glob = Glob::from_vec_string(self.dir_plain.clone());
-            let mut expanded_args = glob.glob(&args[0]);
+            let glob = Glob::from_path(".").unwrap();
+            let mut expanded_args = glob.match_path_single(&args[0]);
             if expanded_args.is_empty() {
                 expanded_args.push(args[0].to_string());
             }
             if args.len() > 1 {
                 for arg in args[1..].iter() {
-                    let g = glob.glob(arg);
+                    let g = glob.match_path_multiple(arg);
                     if g.is_empty() {
                         expanded_args.push(arg.to_string());
                     } else {
