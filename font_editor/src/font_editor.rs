@@ -41,7 +41,7 @@ impl Editor {
             edit_char_offset.y + edit_char_size.y + font_height,
         );
         let edit_char_right = edit_char_offset.x + edit_char_size.x;
-        let font_table_right = font_table_offset.x + (font_width * font::NUM_COLS);
+        let font_table_right = font_table_offset.x + ((font_width + 1) * font::NUM_COLS);
         let sample_text_offset = Vector2i::new(
             font_table_right.max(edit_char_right) + font_width,
             font_height,
@@ -162,8 +162,8 @@ impl Editor {
 
     fn pick_char(&self, x: i32, y: i32) -> Option<i32> {
         let font_grid_pos = Vector2i::new(
-            (x - self.font_table_offset.x) / self.font_size.x / self.font_scale,
-            (y - self.font_table_offset.y) / self.font_size.y / self.font_scale,
+            (x - self.font_table_offset.x) / self.font_size.x / self.font_scale - 1,
+            (y - self.font_table_offset.y) / self.font_size.y / self.font_scale - 1,
         );
         if font_grid_pos.x >= 0
             && font_grid_pos.x < font::NUM_COLS
@@ -181,8 +181,8 @@ impl Editor {
             None
         } else {
             let ch = ch - font::NUM_CHARS_IGNORED;
-            let char_x = ch % font::NUM_COLS;
-            let char_y = ch / font::NUM_COLS;
+            let char_x = ch % font::NUM_COLS + 1;
+            let char_y = ch / font::NUM_COLS + 1;
             let x = char_x * self.font_size.x * self.font_scale + self.font_table_offset.x;
             let y = char_y * self.font_size.y * self.font_scale + self.font_table_offset.y;
             Some(Vector2i::new(x, y))
@@ -241,7 +241,8 @@ impl Editor {
             text_pos.y += self.font_size.y * self.sample_text_scale;
         };
 
-        let text = "The quick brown fox jumps over the lazy dog.";
+        //let text = "The quick brown fox jumps over the lazy dog.";
+        let text = "Victor jagt zwölf Boxkämpfer quer über den großen Sylter Deich.";
 
         draw_text(text, Color::WHITE);
         draw_text(&text.to_uppercase(), Color::rgb(0xc0, 0xc0, 0xff));
@@ -290,10 +291,41 @@ fn main() {
     }
 
     fn draw_full_font_table(&mut self) {
+        let axis = "0123456789ABCDEF";
+        let font_width = self.font_size.x * self.font_scale;
+        let font_height = self.font_size.y * self.font_scale;
+
+        let light_blue = Color::rgb(0xc0, 0xc0, 0xff);
+        for i in 0..16 {
+            // x-axis
+            self.font.draw_text(
+                &axis[i..i + 1],
+                Vector2i::new(
+                    self.font_table_offset.x + (i + 1) as i32 * font_width,
+                    self.font_table_offset.y,
+                ),
+                self.font_scale,
+                light_blue,
+                &mut self.window,
+            );
+        }
+        for i in 2..16 {
+            // y-axis
+            self.font.draw_text(
+                &axis[i..i + 1],
+                Vector2i::new(
+                    self.font_table_offset.x,
+                    self.font_table_offset.y + (i - 1) as i32 * font_height,
+                ),
+                self.font_scale,
+                light_blue,
+                &mut self.window,
+            );
+        }
         let mut sprite = self.font.get_sprite_full();
         sprite.set_position(Vector2f::new(
-            self.font_table_offset.x as f32,
-            self.font_table_offset.y as f32,
+            (self.font_table_offset.x + font_width) as f32,
+            (self.font_table_offset.y + font_height) as f32,
         ));
         sprite.set_scale(Vector2f::new(
             self.font_scale as f32,
