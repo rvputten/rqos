@@ -5,9 +5,8 @@ set -o pipefail
 dirname=$(cd "$(dirname "$0")"; pwd -P)
 exe_name=`basename $dirname`
 
-################
-exe_name=rqsh
-################
+# doesn't work for workspaces; workaround:
+exe_name=${1:-"rqsh"}
 
 scan_error_code_first_40_lines() {
   awk '/^error/{c++; if (c==2) {exit}} {print}' | head -40
@@ -65,6 +64,5 @@ error_to_clipboard tests
 
 
 rg --color=always '#\[allow\((dead_code|unused_variables)\)\]'
-#unbuffer cargo run -p font_editor &
-unbuffer cargo run &
+unbuffer cargo run -p $exe_name --color=always &
 wait_and_run
