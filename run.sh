@@ -36,7 +36,7 @@ function wait_and_run() {
   inotifywait -q -e close_write */src Cargo.toml */Cargo.toml resources/*.{frag,sh}
   clear
 
-  exec ./run.sh
+  exec ./run.sh "$exe_name"
 }
 
 pid=`ps -eo pid,comm|grep -w "$exe_name"|awk '{print $1}'`
