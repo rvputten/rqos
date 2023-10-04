@@ -384,18 +384,23 @@ impl<'a> Text<'a> {
             .iter()
             .enumerate()
         {
+            let line = line.chars().collect::<Vec<_>>();
             let mut skip_chars = 0;
             let mut skipped_chars = 0;
-            for (x, ch) in line.chars().enumerate() {
+            for (x, ch) in line.iter().enumerate() {
                 if skip_chars > 1 {
                     skip_chars -= 1;
                     skipped_chars += 1;
-                } else if ch == 27 as char {
+                } else if *ch == 27 as char {
                     skipped_chars += 1;
-                    let (to_skip, codes) = ansi_colors.parse_ansi_color_code(&line[x..]);
+                    let rest_of_line: String = line[x..].iter().collect();
+                    let (to_skip, codes) = ansi_colors.parse_ansi_color_code(&rest_of_line);
                     skip_chars = to_skip;
                     if codes.is_empty() {
-                        eprintln!("Unrecognized ANSI escape code: {}", line);
+                        eprintln!(
+                            "Unrecognized ANSI escape code: {}",
+                            line.iter().collect::<String>()
+                        );
                     }
                     for code in codes {
                         match code {
@@ -427,7 +432,7 @@ impl<'a> Text<'a> {
                         }
                     }
                 } else {
-                    let mut sprite = font.get_sprite(ch as i32);
+                    let mut sprite = font.get_sprite(*ch as i32);
                     sprite.set_position(Vector2f::new(
                         ((x - skipped_chars) as i32 * font_width) as f32,
                         (start_y + y as i32 * font_height) as f32,
