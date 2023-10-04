@@ -21,5 +21,6 @@ To do
     - settings for loading and saving aliases?
 - variable expansion
 - load and save and edit text
-- make glob work with directory hierarchies
-  - don't scan the directory if no * or ? contained
+- don't scan the directory if no * or ? contained
+- make C-W work in command mode and switch to insert mode
+  - quick path to editing the command line

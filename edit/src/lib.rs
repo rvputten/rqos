@@ -166,7 +166,22 @@ impl Edit {
                     }
                 }
                 (Mode::Normal, S_DN, C_UP) => {}
-                (Mode::Normal, S_UP, C_DN) => {}
+                (Mode::Normal, S_UP, C_DN) => {
+                    let mut found_key = true;
+                    match code {
+                        Key::H => self.backspace(),
+                        Key::W => self.delete_word(),
+                        Key::U => self.text.clear(),
+                        Key::A => self.text.move_cursor_horz(-2),
+                        Key::B => self.text.move_cursor_horz(-1),
+                        Key::E => self.text.move_cursor_horz(2),
+                        Key::F => self.text.move_cursor_horz(1),
+                        _ => found_key = false,
+                    }
+                    if found_key {
+                        self.set_mode(Mode::Insert);
+                    }
+                }
                 (Mode::Normal, S_DN, C_DN) => {}
             }
         } else {
