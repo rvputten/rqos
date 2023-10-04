@@ -15,6 +15,9 @@ pub struct Font {
     pub char_size: Vector2i,
     pub image: Image,
     pub texture: SfBox<Texture>,
+    pub char2idx: Vec<i32>,
+    pub idx2char: Vec<i32>,
+    pub max_char: i32,
 }
 
 impl Font {
@@ -28,11 +31,29 @@ impl Font {
             .load_from_image(&image, IntRect::default())
             .expect("Failed to load texture");
 
+        let mut char2idx = vec![];
+        let mut idx2char = vec![];
+        for ch in 0..128 {
+            char2idx.push(ch);
+            idx2char.push(ch);
+        }
+        let extended = "äöüÄÖÜß";
+        let max_char = extended.chars().map(|ch| ch as i32).max().unwrap();
+        char2idx.resize(max_char as usize + 1, 0);
+        for (i, ch) in extended.chars().enumerate() {
+            let idx = i as i32 + 128;
+            char2idx[ch as usize] = idx;
+            idx2char.push(ch as i32);
+        }
+
         Self {
             name: name.to_string(),
             char_size,
             image,
             texture,
+            char2idx,
+            idx2char,
+            max_char,
         }
     }
 
@@ -41,27 +62,27 @@ impl Font {
     }
 
     pub fn load(name: &str, char_size: Vector2i) -> std::io::Result<Font> {
+        let mut font = Self::new(name, char_size);
         let filename = Self::filename(name, char_size);
-        let image = Image::from_file(&filename).ok_or(std::io::Error::new(
+        font.image = Image::from_file(&filename).ok_or(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             format!("File not found: {}", filename),
         ))?;
-        let mut texture = Texture::new().expect("Failed to create texture");
-        texture
-            .load_from_image(&image, IntRect::default())
+        font.texture = Texture::new().expect("Failed to create texture");
+        font.texture
+            .load_from_image(&font.image, IntRect::default())
             .expect("Failed to load texture");
-        Ok(Self {
-            name: name.to_string(),
-            char_size,
-            image,
-            texture,
-        })
+        Ok(font)
     }
 
     pub fn get_sprite(&self, ch: i32) -> Sprite {
-        if !(0..NUM_CHARS).contains(&ch) {
-            panic!("Invalid character: {}", ch);
-        }
+        //let ch = if !(0..NUM_CHARS).contains(&ch) {
+        let ch = if ch > self.max_char || self.char2idx[ch as usize] == 0 {
+            println!("Invalid character: 0x{:x}='{}'", ch, ch as u8 as char);
+            '?' as i32
+        } else {
+            self.char2idx[ch as usize]
+        };
 
         let x = (ch % NUM_COLS) * self.char_size.x;
         let y = (ch / NUM_COLS) * self.char_size.y;

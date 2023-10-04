@@ -18,7 +18,7 @@ pub struct Editor {
     font_table_offset: Vector2i,
     sample_text_offset: Vector2i,
     window: RenderWindow,
-    display_char: i32,
+    display_idx: i32,
     font: Font,
 }
 
@@ -52,7 +52,7 @@ impl Editor {
             Font::new(font_name, font_size)
         };
 
-        let display_char = 'a' as i32;
+        let display_idx = 'a' as i32;
         let mut editor = Self {
             font_size,
             edit_char_scale,
@@ -62,7 +62,7 @@ impl Editor {
             font_table_offset,
             sample_text_offset,
             window,
-            display_char,
+            display_idx,
             font,
         };
 
@@ -96,18 +96,16 @@ impl Editor {
     fn key_pressed(&mut self, code: Key) {
         match code {
             Key::Escape => self.window.close(),
-            Key::N => self.display_char = (self.display_char + 1) % font::NUM_CHARS,
-            Key::P => {
-                self.display_char = (self.display_char + font::NUM_CHARS - 1) % font::NUM_CHARS
-            }
+            Key::N => self.display_idx = (self.display_idx + 1) % font::NUM_CHARS,
+            Key::P => self.display_idx = (self.display_idx + font::NUM_CHARS - 1) % font::NUM_CHARS,
             Key::C => self.copy_char(),
-            Key::H => self.font.flip_char_horizontal(self.display_char),
-            Key::V => self.font.flip_char_vertical(self.display_char),
+            Key::H => self.font.flip_char_horizontal(self.display_idx),
+            Key::V => self.font.flip_char_vertical(self.display_idx),
             Key::B => self.font.make_all_bold(),
-            Key::Left => self.font.shift_char(self.display_char, -1, 0),
-            Key::Right => self.font.shift_char(self.display_char, 1, 0),
-            Key::Up => self.font.shift_char(self.display_char, 0, -1),
-            Key::Down => self.font.shift_char(self.display_char, 0, 1),
+            Key::Left => self.font.shift_char(self.display_idx, -1, 0),
+            Key::Right => self.font.shift_char(self.display_idx, 1, 0),
+            Key::Up => self.font.shift_char(self.display_idx, 0, -1),
+            Key::Down => self.font.shift_char(self.display_idx, 0, 1),
             _ => {}
         }
     }
@@ -141,7 +139,7 @@ impl Editor {
     fn copy_char(&mut self) {
         let mouse_pos = self.window.mouse_position();
         if let Some(ch) = self.pick_char(mouse_pos.x, mouse_pos.y) {
-            self.font.copy_char(ch, self.display_char);
+            self.font.copy_char(ch, self.display_idx);
         }
     }
 
@@ -150,20 +148,20 @@ impl Editor {
         let pixel_y = (y - self.edit_char_offset.y) / self.edit_char_scale;
         if pixel_x < self.font_size.x && pixel_y < self.font_size.y {
             self.font
-                .set_pixel(self.display_char, pixel_x, pixel_y, color);
+                .set_pixel(self.display_idx, pixel_x, pixel_y, color);
         }
     }
 
     fn pick_edit_char(&mut self, x: i32, y: i32) {
         if let Some(char) = self.pick_char(x, y) {
-            self.display_char = char;
+            self.display_idx = char;
         }
     }
 
     fn pick_char(&self, x: i32, y: i32) -> Option<i32> {
         let font_grid_pos = Vector2i::new(
             (x - self.font_table_offset.x) / self.font_size.x / self.font_scale - 1,
-            (y - self.font_table_offset.y) / self.font_size.y / self.font_scale - 1,
+            (y - self.font_table_offset.y) / self.font_size.y / self.font_scale - 2,
         );
         if font_grid_pos.x >= 0
             && font_grid_pos.x < font::NUM_COLS
@@ -176,13 +174,13 @@ impl Editor {
         }
     }
 
-    fn font_char_pos(&self, ch: i32) -> Option<Vector2i> {
-        if ch < font::NUM_CHARS_IGNORED {
+    fn font_char_pos(&self, idx: i32) -> Option<Vector2i> {
+        if idx < font::NUM_CHARS_IGNORED {
             None
         } else {
-            let ch = ch - font::NUM_CHARS_IGNORED;
-            let char_x = ch % font::NUM_COLS + 1;
-            let char_y = ch / font::NUM_COLS + 1;
+            let idx = idx - font::NUM_CHARS_IGNORED;
+            let char_x = idx % font::NUM_COLS + 1;
+            let char_y = idx / font::NUM_COLS + 2;
             let x = char_x * self.font_size.x * self.font_scale + self.font_table_offset.x;
             let y = char_y * self.font_size.y * self.font_scale + self.font_table_offset.y;
             Some(Vector2i::new(x, y))
@@ -200,7 +198,9 @@ impl Editor {
             |x: i32, y: i32, color: Color| Vertex::with_pos_color(grid_pos(x, y), color);
 
         // display char
-        let mut sprite = self.font.get_sprite(self.display_char);
+        let mut sprite = self
+            .font
+            .get_sprite(self.font.idx2char[self.display_idx as usize]);
         sprite.set_position(grid_pos(0, 0));
         sprite.set_scale(Vector2f::new(
             self.edit_char_scale as f32,
@@ -291,10 +291,27 @@ fn main() {
     }
 
     fn draw_full_font_table(&mut self) {
-        let axis = "0123456789ABCDEF";
         let font_width = self.font_size.x * self.font_scale;
         let font_height = self.font_size.y * self.font_scale;
 
+        // draw char info
+        let char_idx = self.display_idx;
+        let char_ch = self.font.idx2char[char_idx as usize];
+        let char_repr = std::char::from_u32(char_ch as u32).unwrap_or('?');
+        let char_info = format!(
+            "idx:{:x} unicode:{:x} char:{}",
+            char_idx, char_ch, char_repr
+        );
+        self.font.draw_text(
+            &char_info,
+            self.font_table_offset,
+            self.font_scale,
+            Color::WHITE,
+            &mut self.window,
+        );
+
+        // draw axis
+        let axis = "0123456789ABCDEF";
         let light_blue = Color::rgb(0xc0, 0xc0, 0xff);
         for i in 0..16 {
             // x-axis
@@ -302,7 +319,7 @@ fn main() {
                 &axis[i..i + 1],
                 Vector2i::new(
                     self.font_table_offset.x + (i + 1) as i32 * font_width,
-                    self.font_table_offset.y,
+                    self.font_table_offset.y + font_height,
                 ),
                 self.font_scale,
                 light_blue,
@@ -315,17 +332,19 @@ fn main() {
                 &axis[i..i + 1],
                 Vector2i::new(
                     self.font_table_offset.x,
-                    self.font_table_offset.y + (i - 1) as i32 * font_height,
+                    self.font_table_offset.y + i as i32 * font_height,
                 ),
                 self.font_scale,
                 light_blue,
                 &mut self.window,
             );
         }
+
+        // draw actual table
         let mut sprite = self.font.get_sprite_full();
         sprite.set_position(Vector2f::new(
             (self.font_table_offset.x + font_width) as f32,
-            (self.font_table_offset.y + font_height) as f32,
+            (self.font_table_offset.y + 2 * font_height) as f32,
         ));
         sprite.set_scale(Vector2f::new(
             self.font_scale as f32,
@@ -335,7 +354,7 @@ fn main() {
     }
 
     fn draw_active_char_border(&mut self) {
-        self.draw_char_border(self.display_char, Color::rgb(0xC0, 0xC0, 0xC0));
+        self.draw_char_border(self.display_idx, Color::rgb(0xC0, 0xC0, 0xC0));
     }
 
     fn draw_hover_char_border(&mut self) {
