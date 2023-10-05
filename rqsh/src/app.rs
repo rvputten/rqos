@@ -22,7 +22,6 @@ pub struct App<'a> {
     font: font::Font,
     font_scale: i32,
     main_text: text::Text<'a>,
-    directory: text::Text<'a>,
     status_line: text::Text<'a>,
     command: edit::Edit,
     window: RenderWindow,
@@ -45,11 +44,8 @@ impl App<'_> {
         let font_scale = 1;
         let font = font::Font::load(font_name, font_size).expect("Failed to load font");
 
-        let font_width = font_size.x * font_scale;
         let font_height = font_size.y * font_scale;
-        let dir_window_cols = 40;
-        let dir_window_width = dir_window_cols * font_width;
-        let (cols, rows) = (120 + dir_window_cols, 80);
+        let (cols, rows) = (160, 80);
         let window_width = cols * font_size.x * font_scale;
         let window_height = rows * font_height;
         let (window_pos_x, window_pos_y) = (
@@ -68,26 +64,11 @@ impl App<'_> {
 
         let colors = color::AnsiColor::new();
         let yellow = colors.get_color("Yellow").unwrap();
-        let blue = colors.get_color("Blue").unwrap();
 
         let main_text = text::TextBuilder::new()
             .position(Vector2i::new(0, 0))
-            .size(Vector2i::new(
-                window_width - dir_window_width,
-                window_height - font_height * 2,
-            ))
+            .size(Vector2i::new(window_width, window_height - font_height * 2))
             .vertical_alignment(text::VerticalAlignment::AlwaysBottom)
-            .build();
-
-        let directory = text::TextBuilder::new()
-            .position(Vector2i::new(window_width - dir_window_width, 0))
-            .size(Vector2i::new(
-                dir_window_width,
-                window_height - font_height * 2,
-            ))
-            .vertical_alignment(text::VerticalAlignment::AlwaysBottom)
-            .bg_color(Color::WHITE)
-            .fg_color(blue)
             .build();
 
         let status_line = text::TextBuilder::new()
@@ -106,7 +87,6 @@ impl App<'_> {
             font,
             font_scale,
             main_text,
-            directory,
             status_line,
             command,
             window,
@@ -151,7 +131,6 @@ impl App<'_> {
 
             self.window.clear(Color::BLACK);
             self.main_text.draw(&mut self.window, &self.font);
-            self.directory.draw(&mut self.window, &self.font);
             self.status_line.draw(&mut self.window, &self.font);
             self.command.draw(&mut self.window, &self.font);
             self.window.display();
@@ -178,22 +157,11 @@ impl App<'_> {
     }
 
     fn set_window_sizes(&mut self, width: i32, height: i32) {
-        let font_width = self.font.char_size.x * self.font_scale;
         let font_height = self.font.char_size.y * self.font_scale;
-
-        let dir_window_width = if width < 40 * font_width {
-            2 * font_width
-        } else {
-            40 * font_width
-        };
 
         self.main_text.set_position_size(
             Vector2i::new(0, 0),
-            Vector2i::new(width - dir_window_width, height - font_height * 2),
-        );
-        self.directory.set_position_size(
-            Vector2i::new(width - dir_window_width, 0),
-            Vector2i::new(dir_window_width, height - font_height * 2),
+            Vector2i::new(width, height - font_height * 2),
         );
         self.status_line.set_position_size(
             Vector2i::new(0, height - font_height * 2),
@@ -320,11 +288,6 @@ impl App<'_> {
         }
         self.dir_plain = dir_plain.lines().map(|s| s.to_string()).collect();
         self.dir_plain.sort();
-
-        let mut dir_adorned: Vec<String> = dir_adorned.lines().map(|s| s.to_string()).collect();
-        dir_adorned.sort();
-
-        self.directory.replace(dir_adorned);
     }
 
     fn run_command(&mut self) {

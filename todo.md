@@ -22,9 +22,3 @@ To do
 - variable expansion
 - load and save and edit text
 - don't scan the directory if no * or ? contained
-- make C-W work in command mode and switch to insert mode
-  - quick path to editing the command line
-
-font editor
------------
-check correct usage of `char_idx/display_idx` in `font::copy_char, set_pixel` etc.
