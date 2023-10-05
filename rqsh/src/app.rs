@@ -24,12 +24,15 @@ pub struct App<'a> {
     main_text: text::Text<'a>,
     status_line: text::Text<'a>,
     command: edit::Edit,
+    command_bg_color_normal: Color,
+    command_bg_color_running: Color,
     window: RenderWindow,
     dir_plain: Vec<String>,
     jobs: Vec<Job>,
     browse_job_history_idx: usize,
     tx: mpsc::Sender<ExecMessage>,
     rx: mpsc::Receiver<ExecMessage>,
+    stdin_tx: Option<mpsc::Sender<String>>,
     colors: color::AnsiColor,
 }
 
@@ -64,6 +67,7 @@ impl App<'_> {
 
         let colors = color::AnsiColor::new();
         let yellow = colors.get_color("Yellow").unwrap();
+        let light_blue = colors.get_color("Light Blue").unwrap();
 
         let main_text = text::TextBuilder::new()
             .position(Vector2i::new(0, 0))
@@ -78,6 +82,8 @@ impl App<'_> {
             .bg_color(yellow)
             .build();
 
+        let command_bg_color_normal = Color::WHITE;
+        let command_bg_color_running = light_blue;
         let command = edit::EditBuilder::new()
             .cursor_colors(Color::BLACK, yellow)
             .build();
@@ -89,12 +95,15 @@ impl App<'_> {
             main_text,
             status_line,
             command,
+            command_bg_color_normal,
+            command_bg_color_running,
             window,
             dir_plain: Vec::new(),
             jobs: Vec::new(),
             browse_job_history_idx: 0,
             tx,
             rx,
+            stdin_tx: None,
             colors,
         };
 
@@ -182,13 +191,21 @@ impl App<'_> {
     }
 
     fn insert_mode_key_pressed(&mut self, code: Key) {
-        match code {
-            Key::Enter => self.run_command(),
-            Key::Up => self.scroll(ScrollType::CursorUp),
-            Key::Down => self.scroll(ScrollType::CursorDown),
-            Key::PageUp => self.scroll(ScrollType::PageUp),
-            Key::PageDown => self.scroll(ScrollType::PageDown),
-            _ => self.command.key_pressed(code),
+        if self.command.control {
+            if code == Key::D {
+                self.end_job();
+            } else {
+                self.command.key_pressed(code);
+            }
+        } else {
+            match code {
+                Key::Enter => self.run_command(),
+                Key::Up => self.scroll(ScrollType::CursorUp),
+                Key::Down => self.scroll(ScrollType::CursorDown),
+                Key::PageUp => self.scroll(ScrollType::PageUp),
+                Key::PageDown => self.scroll(ScrollType::PageDown),
+                _ => self.command.key_pressed(code),
+            }
         }
     }
 
@@ -295,9 +312,16 @@ impl App<'_> {
 
         self.main_text.scroll_pos_y = 0;
         let command = self.command.replace(vec![]);
-        if !command.is_empty() && !command[0].trim().is_empty() {
-            // Expand glob patterns
-            let args = Args::new(&command[0]).args;
+        if self.stdin_tx.is_some() {
+            let send_string = if !command.is_empty() && !command[0].trim().is_empty() {
+                format!("{}\n", command[0])
+            } else {
+                "\n".to_string()
+            };
+            self.stdin_tx.as_ref().unwrap().send(send_string).unwrap();
+        } else if !command.is_empty() && !command[0].trim().is_empty() {
+            let command = command[0].trim().to_string();
+            let args = Args::new(&command).args;
             let glob = Glob::from_path(".").unwrap();
             let mut expanded_args = glob.match_path_single(&args[0]);
             if expanded_args.is_empty() {
@@ -374,15 +398,29 @@ impl App<'_> {
 
     fn handle_exec_messages(&mut self, message: ExecMessage) {
         match message {
+            ExecMessage::StdInQueue(tx) => {
+                self.stdin_tx = Some(tx);
+                self.command
+                    .set_background_color(self.command_bg_color_running);
+            }
             ExecMessage::StdOut(output) | ExecMessage::StdErr(output) => {
                 self.main_text.write(&output);
                 self.main_text.redraw = true;
             }
             ExecMessage::JobDone(job) => {
+                self.stdin_tx = None;
+                self.command
+                    .set_background_color(self.command_bg_color_normal);
                 self.jobs.push(job);
                 self.update_pwd_directory();
                 self.write_intermediate_status_line();
             }
         }
+    }
+
+    fn end_job(&mut self) {
+        self.stdin_tx = None;
+        self.command
+            .set_background_color(self.command_bg_color_normal);
     }
 }

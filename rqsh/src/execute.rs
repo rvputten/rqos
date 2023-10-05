@@ -1,4 +1,4 @@
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Write};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::thread;
@@ -45,6 +45,7 @@ impl Job {
 pub enum ExecMessage {
     StdOut(String),
     StdErr(String),
+    StdInQueue(mpsc::Sender<String>),
     JobDone(Job),
 }
 
@@ -100,11 +101,21 @@ impl Execute {
         job.start();
         if let Ok(mut child) = Command::new(&job.args[0])
             .args(&job.args[1..])
-            .env("TERM", "xterm-256color")
+            .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
         {
+            if let Some(stdin) = child.stdin.take() {
+                let mut stdin = stdin;
+                let (tx_stdin, rx_stdin) = mpsc::channel::<String>();
+                tx.send(ExecMessage::StdInQueue(tx_stdin)).unwrap();
+                thread::spawn(move || {
+                    for s in rx_stdin {
+                        stdin.write_all(s.as_bytes()).unwrap();
+                    }
+                });
+            };
             if let Some(stdout) = child.stdout.take() {
                 let reader_stdout = BufReader::new(stdout);
                 thread::spawn(move || send_loop(Box::new(reader_stdout), Box::new(send_stdout)));
@@ -124,6 +135,6 @@ impl Execute {
             job.return_code = Some(1);
         }
         job.end();
-        tx.send(ExecMessage::JobDone(job)).unwrap();
+        tx.send(ExecMessage::JobDone(job)).unwrap_or_default();
     }
 }
