@@ -100,6 +100,7 @@ impl Execute {
         job.start();
         if let Ok(mut child) = Command::new(&job.args[0])
             .args(&job.args[1..])
+            .env("TERM", "xterm-256color")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
