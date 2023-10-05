@@ -335,7 +335,7 @@ impl App<'_> {
 
     fn write_intermediate_status_line(&mut self) {
         let job = self.jobs.last().unwrap();
-        let command = job.args.join(" ");
+        let command = job.args_printable();
         let return_code = job.return_code.unwrap();
         let colors = color::AnsiColor::new();
         let bg = if return_code == 0 {
