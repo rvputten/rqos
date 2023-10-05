@@ -1,8 +1,6 @@
 /target
 error.txt
 Cargo.lock
-gd
-gl
 x
 t
 .vscode
