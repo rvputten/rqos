@@ -1,0 +1,4 @@
+#!/bin/bash
+for file in $(git ls-files); do
+    echo "$file -> $(git log -1 --pretty=format:%s -- $file)"
+done
