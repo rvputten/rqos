@@ -22,3 +22,4 @@ To do
 - variable expansion
 - load and save and edit text
 - don't scan the directory if no * or ? contained
+- don't show cursor or some other way to indicate that the program is running

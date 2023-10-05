@@ -115,12 +115,16 @@ impl TextBuilder {
         let bold = self.bold.unwrap_or(false);
         let cursor_state = self.cursor_state.unwrap_or(CursorState::Hidden);
 
-        let shader = if let Ok(shader) =
-            Shader::from_file("resources/color_bold.frag", ShaderType::Fragment)
-        {
-            shader
-        } else {
+        // tests are run from the text directory, the main program from the root
+        let current_directory: String = std::env::current_dir()
+            .unwrap()
+            .into_os_string()
+            .into_string()
+            .unwrap();
+        let shader = if current_directory.ends_with("text") {
             Shader::from_file("../resources/color_bold.frag", ShaderType::Fragment).unwrap()
+        } else {
+            Shader::from_file("resources/color_bold.frag", ShaderType::Fragment).unwrap()
         };
 
         Text {
