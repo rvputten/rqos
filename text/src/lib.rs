@@ -232,6 +232,11 @@ impl<'a> Text<'a> {
         self
     }
 
+    pub fn set_background_color(&mut self, color: Color) {
+        self.background_color(color);
+        self.redraw = true;
+    }
+
     pub fn get_cursor_state(&self) -> CursorState {
         self.cursor_state
     }

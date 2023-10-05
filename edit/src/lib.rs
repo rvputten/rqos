@@ -65,8 +65,8 @@ impl Default for EditBuilder {
 
 pub struct Edit {
     text: Text<'static>,
-    shift: bool,
-    control: bool,
+    pub shift: bool,
+    pub control: bool,
     pub mode: Mode,
 }
 
@@ -87,6 +87,10 @@ impl Edit {
     pub fn cursor_colors(&mut self, insert: Color, normal: Color) -> &mut Self {
         self.text.set_cursor_colors(insert, normal);
         self
+    }
+
+    pub fn set_background_color(&mut self, color: Color) {
+        self.text.set_background_color(color);
     }
 
     pub fn set_cursor_colors(&mut self, insert: Color, normal: Color) {
