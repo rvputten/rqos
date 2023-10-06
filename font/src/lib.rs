@@ -37,7 +37,7 @@ impl Font {
             char2idx.push(ch);
             idx2char.push(ch);
         }
-        let extended = "äöüÄÖÜß";
+        let extended = "äöüÄÖÜß‘•〈〉\u{27e8}\u{27e9}";
         let max_char = extended.chars().map(|ch| ch as i32).max().unwrap();
         char2idx.resize(max_char as usize + 1, 0);
         for (i, ch) in extended.chars().enumerate() {
