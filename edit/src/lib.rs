@@ -113,6 +113,10 @@ impl Edit {
         self.text.draw(window, font);
     }
 
+    pub fn must_draw(&self) -> bool {
+        self.text.must_draw()
+    }
+
     pub fn set_position_size(&mut self, position: Vector2i, size: Vector2i) {
         self.text.set_position_size(position, size);
     }

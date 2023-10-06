@@ -117,6 +117,7 @@ impl App<'_> {
 
     pub fn run(&mut self) {
         while self.window.is_open() {
+            let t = std::time::Instant::now();
             while let Some(event) = self.window.poll_event() {
                 match event {
                     Event::Closed => self.window.close(),
@@ -142,11 +143,23 @@ impl App<'_> {
                 self.handle_exec_messages(message);
             }
 
-            self.window.clear(Color::BLACK);
-            self.main_text.draw(&mut self.window, &self.font);
-            self.status_line.draw(&mut self.window, &self.font);
-            self.command.draw(&mut self.window, &self.font);
-            self.window.display();
+            if self.main_text.must_draw()
+                || self.status_line.must_draw()
+                || self.command.must_draw()
+            {
+                self.window.clear(Color::BLACK);
+                self.main_text.draw(&mut self.window, &self.font);
+                self.status_line.draw(&mut self.window, &self.font);
+                self.command.draw(&mut self.window, &self.font);
+
+                self.window.display();
+            }
+
+            let elapsed = t.elapsed();
+            let frame_diff = 16 - elapsed.as_millis() as i32;
+            if frame_diff > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(frame_diff as u64));
+            }
         }
     }
 

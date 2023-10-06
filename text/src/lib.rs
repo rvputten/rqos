@@ -529,6 +529,10 @@ impl<'a> Text<'a> {
         window.draw(&sprite);
     }
 
+    pub fn must_draw(&self) -> bool {
+        self.redraw
+    }
+
     pub fn move_cursor_horz(&mut self, dir: i32) {
         match dir {
             -1 => self.cursor_position.x -= 1,
