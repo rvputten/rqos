@@ -1,4 +1,6 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
+use std::sync::Arc;
 
 use sfml::graphics::{Color, RenderTarget, RenderWindow};
 use sfml::system::Vector2i;
@@ -33,6 +35,7 @@ pub struct App<'a> {
     tx: mpsc::Sender<ExecMessage>,
     rx: mpsc::Receiver<ExecMessage>,
     stdin_tx: Option<mpsc::Sender<String>>,
+    stop_thread: Option<Arc<AtomicBool>>,
     colors: color::AnsiColor,
 }
 
@@ -104,6 +107,7 @@ impl App<'_> {
             tx,
             rx,
             stdin_tx: None,
+            stop_thread: None,
             colors,
         };
 
@@ -192,10 +196,10 @@ impl App<'_> {
 
     fn insert_mode_key_pressed(&mut self, code: Key) {
         if self.command.control {
-            if code == Key::D {
-                self.end_job();
-            } else {
-                self.command.key_pressed(code);
+            match code {
+                Key::C => self.kill_job(),
+                Key::D => self.send_eof(),
+                _ => self.command.key_pressed(code),
             }
         } else {
             match code {
@@ -353,7 +357,7 @@ impl App<'_> {
                 self.colors.reset()
             ));
 
-            BuiltIn::run(self.tx.clone(), job);
+            self.stop_thread = BuiltIn::run(self.tx.clone(), job);
         }
     }
 
@@ -408,9 +412,7 @@ impl App<'_> {
                 self.main_text.redraw = true;
             }
             ExecMessage::JobDone(job) => {
-                self.stdin_tx = None;
-                self.command
-                    .set_background_color(self.command_bg_color_normal);
+                self.end_job();
                 self.jobs.push(job);
                 self.update_pwd_directory();
                 self.write_intermediate_status_line();
@@ -418,9 +420,20 @@ impl App<'_> {
         }
     }
 
-    fn end_job(&mut self) {
+    fn send_eof(&mut self) {
         self.stdin_tx = None;
         self.command
             .set_background_color(self.command_bg_color_normal);
+    }
+
+    fn kill_job(&mut self) {
+        println!("killing job with stop_thread: {:?}", self.stop_thread);
+        if let Some(stop_thread) = self.stop_thread.take() {
+            stop_thread.store(true, Ordering::SeqCst);
+        }
+    }
+
+    fn end_job(&mut self) {
+        self.send_eof();
     }
 }

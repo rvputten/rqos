@@ -1,4 +1,6 @@
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::thread;
 
 use crate::execute::{ExecMessage, Execute, Job};
@@ -44,7 +46,7 @@ use crate::execute::{ExecMessage, Execute, Job};
 pub struct BuiltIn {}
 
 impl BuiltIn {
-    pub fn run(tx: mpsc::Sender<ExecMessage>, mut job: Job) {
+    pub fn run(tx: mpsc::Sender<ExecMessage>, mut job: Job) -> Option<Arc<AtomicBool>> {
         macro_rules! finish {
             ($return_code:expr, $output:expr) => {
                 job.return_code = Some($return_code);
@@ -84,18 +86,23 @@ impl BuiltIn {
                         finish!(1, v);
                     }
                 }
+                None
             }
             "yes" => {
                 job.start();
                 let output = vec!["yes".to_string()];
                 finish!(0, output);
+                None
             }
             _ => {
                 let tx = tx.clone();
+                let stop_thread = Arc::new(AtomicBool::new(false));
+                let x = stop_thread.clone();
                 thread::spawn(move || {
-                    Execute::run(tx, job);
+                    Execute::run(tx, job, x);
                 });
+                Some(stop_thread)
             }
-        };
+        }
     }
 }

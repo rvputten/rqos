@@ -1,6 +1,8 @@
 use std::io::{BufReader, Read, Write};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::thread;
 
 pub struct Job {
@@ -52,7 +54,7 @@ pub enum ExecMessage {
 pub struct Execute {}
 
 impl Execute {
-    pub fn run(tx: mpsc::Sender<ExecMessage>, mut job: Job) {
+    pub fn run(tx: mpsc::Sender<ExecMessage>, mut job: Job, stop_thread: Arc<AtomicBool>) {
         let tx_stdout = tx.clone();
         let tx_stderr = tx.clone();
 
@@ -124,7 +126,35 @@ impl Execute {
                 let reader_stderr = BufReader::new(stderr);
                 thread::spawn(move || send_loop(Box::new(reader_stderr), Box::new(send_stderr)));
             };
-            let return_code = child.wait().unwrap().code().unwrap();
+            let mut return_code = 0;
+            loop {
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        return_code = status.code().unwrap_or(1);
+                        break;
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        println!("Error executing command: {}", e);
+                        break;
+                    }
+                }
+
+                // Check if we should stop
+                if stop_thread.load(Ordering::SeqCst) {
+                    println!("Stopping thread");
+                    child.kill().unwrap();
+                    tx.send(ExecMessage::StdErr(format!(
+                        "Error: `{}` killed",
+                        job.args_printable()
+                    )))
+                    .unwrap();
+                    job.return_code = Some(1);
+                    stop_thread.store(false, Ordering::SeqCst);
+                } else {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+            }
             job.return_code = Some(return_code);
         } else {
             tx.send(ExecMessage::StdErr(format!(
