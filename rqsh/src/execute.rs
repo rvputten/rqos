@@ -25,10 +25,18 @@ impl Job {
     pub fn args_printable(&self) -> String {
         let mut s = String::new();
         for arg in &self.args {
-            if arg.contains(' ') {
-                s.push_str(&format!("\"{}\" ", arg));
+            let mut arg_quotes = String::new();
+            for c in arg.chars() {
+                if c == '"' {
+                    arg_quotes.push('\\');
+                }
+                arg_quotes.push(c);
+            }
+
+            if arg_quotes.contains(' ') {
+                s.push_str(&format!("\"{}\" ", arg_quotes));
             } else {
-                s.push_str(&format!("{} ", arg));
+                s.push_str(&format!("{} ", arg_quotes));
             }
         }
         s.pop();
