@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
 
-use crate::execute::{ExecMessage, Execute, Job};
+use crate::execute::{BuiltinCommand, ExecMessage, Execute, Job};
 /*
 1. cd: Change the current directory.
 2. echo: Print arguments to the standard output.
@@ -43,10 +43,20 @@ use crate::execute::{ExecMessage, Execute, Job};
 35. help: Display help for a built-in command.
 */
 
-pub struct BuiltIn {}
+pub struct Builtin {}
 
-impl BuiltIn {
-    pub fn run(tx: mpsc::Sender<ExecMessage>, mut job: Job) -> Option<Arc<AtomicBool>> {
+impl Builtin {
+    pub fn run(tx: mpsc::Sender<ExecMessage>, job: Job) -> Option<Arc<AtomicBool>> {
+        match job.args[0].as_str() {
+            "cd" => Builtin::cmd_cd(tx, job),
+            "jobs" => Builtin::cmd_jobs(tx, job),
+            _ => Builtin::cmd_run_exec(tx, job),
+        }
+    }
+
+    fn cmd_cd(tx: mpsc::Sender<ExecMessage>, mut job: Job) -> Option<Arc<AtomicBool>> {
+        let v: Vec<String> = vec![];
+
         macro_rules! finish {
             ($return_code:expr, $output:expr) => {
                 job.return_code = Some($return_code);
@@ -57,52 +67,66 @@ impl BuiltIn {
                 tx.send(ExecMessage::JobDone(job)).unwrap();
             };
         }
-
-        let v: Vec<String> = vec![];
-
-        match job.args[0].as_str() {
-            "cd" => {
-                job.start();
-                if job.args.len() == 1 {
-                    std::env::set_current_dir(std::env::var("HOME").unwrap()).unwrap();
-                    finish!(0, v);
-                } else {
-                    let path = &job.args[1];
-                    let path = if path == "-" {
-                        std::env::var("OLDPWD").unwrap()
-                    } else {
-                        path.to_string()
-                    };
-                    let path = std::path::Path::new(&path);
-                    if path.exists() {
-                        std::env::set_current_dir(path).unwrap();
-                        finish!(0, v);
-                    } else {
-                        tx.send(ExecMessage::StdErr(format!(
-                            "cd: {}: No such file or directory",
-                            path.display()
-                        )))
-                        .unwrap();
-                        finish!(1, v);
-                    }
-                }
-                None
-            }
-            "yes" => {
-                job.start();
-                let output = vec!["yes".to_string()];
-                finish!(0, output);
-                None
-            }
-            _ => {
-                let tx = tx.clone();
-                let stop_thread = Arc::new(AtomicBool::new(false));
-                let x = stop_thread.clone();
-                thread::spawn(move || {
-                    Execute::run(tx, job, x);
-                });
-                Some(stop_thread)
+        job.start();
+        if job.args.len() == 1 {
+            std::env::set_current_dir(std::env::var("HOME").unwrap()).unwrap();
+            finish!(0, v);
+        } else {
+            let path = &job.args[1];
+            let path = if path == "-" {
+                std::env::var("OLDPWD").unwrap()
+            } else {
+                path.to_string()
+            };
+            let path = std::path::Path::new(&path);
+            if path.exists() {
+                std::env::set_current_dir(path).unwrap();
+                finish!(0, v);
+            } else {
+                tx.send(ExecMessage::StdErr(format!(
+                    "cd: {}: No such file or directory",
+                    path.display()
+                )))
+                .unwrap();
+                finish!(1, v);
             }
         }
+        None
+    }
+
+    fn cmd_jobs(tx: mpsc::Sender<ExecMessage>, mut job: Job) -> Option<Arc<AtomicBool>> {
+        job.start();
+        tx.send(ExecMessage::BuiltinCommand(BuiltinCommand::Jobs))
+            .unwrap();
+        job.return_code = Some(0);
+        None
+    }
+
+    fn cmd_run_exec(tx: mpsc::Sender<ExecMessage>, job: Job) -> Option<Arc<AtomicBool>> {
+        let tx = tx.clone();
+        let stop_thread = Arc::new(AtomicBool::new(false));
+        let x = stop_thread.clone();
+        thread::spawn(move || {
+            Execute::run(tx, job, x);
+        });
+        Some(stop_thread)
+    }
+
+    pub fn jobs(tx: mpsc::Sender<ExecMessage>, jobs: &[Job]) {
+        let mut v = vec![];
+        for job in jobs {
+            if job.end_time.is_none() {
+                let t = std::time::SystemTime::now()
+                    .duration_since(job.start_time.unwrap())
+                    .unwrap();
+                let time_human_readable = format!("{}.{:03}s", t.as_secs(), t.subsec_millis());
+                v.push(format!(
+                    "{} running for {}",
+                    job.args.join(" "),
+                    time_human_readable
+                ));
+            }
+        }
+        tx.send(ExecMessage::StdOut(v.join("\n"))).unwrap();
     }
 }

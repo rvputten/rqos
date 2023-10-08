@@ -24,3 +24,4 @@ To do
 - don't scan the directory if no * or ? contained
 - quit running program with C-C
 - "jobs"/"ps" internal commands
+- quote quotes when displaying args

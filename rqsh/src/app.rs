@@ -7,8 +7,8 @@ use sfml::system::Vector2i;
 use sfml::window::{Event, Key, Style};
 
 use crate::args::Args;
-use crate::builtin::BuiltIn;
-use crate::execute::{ExecMessage, Job};
+use crate::builtin::Builtin;
+use crate::execute::{BuiltinCommand, ExecMessage, Job};
 use crate::glob::Glob;
 
 enum ScrollType {
@@ -370,7 +370,7 @@ impl App<'_> {
                 self.colors.reset()
             ));
 
-            self.stop_thread = BuiltIn::run(self.tx.clone(), job);
+            self.stop_thread = Builtin::run(self.tx.clone(), job);
         }
     }
 
@@ -430,7 +430,14 @@ impl App<'_> {
                 self.update_pwd_directory();
                 self.write_intermediate_status_line();
             }
+            ExecMessage::BuiltinCommand(cmd) => self.handle_builtin_command(cmd),
         }
+    }
+
+    fn handle_builtin_command(&mut self, cmd: BuiltinCommand) {
+        match cmd {
+            BuiltinCommand::Jobs => Builtin::jobs(self.tx.clone(), &self.jobs),
+        };
     }
 
     fn send_eof(&mut self) {

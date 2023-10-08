@@ -44,10 +44,15 @@ impl Job {
     }
 }
 
+pub enum BuiltinCommand {
+    Jobs,
+}
+
 pub enum ExecMessage {
     StdOut(String),
     StdErr(String),
     StdInQueue(mpsc::Sender<String>),
+    BuiltinCommand(BuiltinCommand),
     JobDone(Job),
 }
 
