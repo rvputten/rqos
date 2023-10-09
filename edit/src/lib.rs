@@ -156,7 +156,8 @@ impl Edit {
                 (Mode::Insert, S_UP, C_DN) => match code {
                     Key::H => self.backspace(),
                     Key::W => self.delete_word(),
-                    Key::U => self.text.clear(),
+                    Key::U => self.text.clear_to_here(),
+                    Key::K => self.text.clear_from_here(),
                     Key::A => self.text.move_cursor_horz(-2),
                     Key::B => self.text.move_cursor_horz(-1),
                     Key::E => self.text.move_cursor_horz(2),
@@ -179,7 +180,8 @@ impl Edit {
                     match code {
                         Key::H => self.backspace(),
                         Key::W => self.delete_word(),
-                        Key::U => self.text.clear(),
+                        Key::U => self.text.clear_to_here(),
+                        Key::K => self.text.clear_from_here(),
                         Key::A => self.text.move_cursor_horz(-2),
                         Key::B => self.text.move_cursor_horz(-1),
                         Key::E => self.text.move_cursor_horz(2),

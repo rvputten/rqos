@@ -289,9 +289,20 @@ impl<'a> Text<'a> {
         self.text.clone()
     }
 
-    pub fn clear(&mut self) {
-        self.text = vec![String::new()];
-        self.cursor_position = Vector2i::new(0, 0);
+    pub fn clear_to_here(&mut self) {
+        let line = self.text[self.cursor_position.y as usize].clone()
+            [self.cursor_position.x as usize..]
+            .to_string();
+        self.text[self.cursor_position.y as usize] = line;
+        self.cursor_position.x = 0;
+        self.redraw = true;
+    }
+
+    pub fn clear_from_here(&mut self) {
+        let line = self.text[self.cursor_position.y as usize].clone()
+            [..self.cursor_position.x as usize]
+            .to_string();
+        self.text[self.cursor_position.y as usize] = line;
         self.redraw = true;
     }
 
