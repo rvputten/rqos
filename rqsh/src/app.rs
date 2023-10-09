@@ -23,9 +23,9 @@ enum ScrollType {
 pub struct App<'a> {
     font: font::Font,
     font_scale: i32,
-    main_text: text::Text<'a>,
-    status_line: text::Text<'a>,
-    command: edit::Edit,
+    main_win: text::Text<'a>,
+    status_win: text::Text<'a>,
+    command_win: edit::Edit,
     command_bg_color_normal: Color,
     command_bg_color_running: Color,
     window: RenderWindow,
@@ -72,13 +72,13 @@ impl App<'_> {
         let yellow = colors.get_color("Yellow").unwrap();
         let light_blue = colors.get_color("Light Blue").unwrap();
 
-        let main_text = text::TextBuilder::new()
+        let main_win = text::TextBuilder::new()
             .position(Vector2i::new(0, 0))
             .size(Vector2i::new(window_width, window_height - font_height * 2))
             .vertical_alignment(text::VerticalAlignment::AlwaysBottom)
             .build();
 
-        let status_line = text::TextBuilder::new()
+        let status_win = text::TextBuilder::new()
             .position(Vector2i::new(0, window_height - font_height * 2))
             .size(Vector2i::new(window_width, font_height))
             .fg_color(Color::BLACK)
@@ -87,7 +87,7 @@ impl App<'_> {
 
         let command_bg_color_normal = Color::WHITE;
         let command_bg_color_running = light_blue;
-        let command = edit::EditBuilder::new()
+        let command_win = edit::EditBuilder::new()
             .cursor_colors(Color::BLACK, yellow)
             .build();
 
@@ -95,9 +95,9 @@ impl App<'_> {
         let mut app = Self {
             font,
             font_scale,
-            main_text,
-            status_line,
-            command,
+            main_win,
+            status_win,
+            command_win,
             command_bg_color_normal,
             command_bg_color_running,
             window,
@@ -122,7 +122,7 @@ impl App<'_> {
                 match event {
                     Event::Closed => self.window.close(),
                     Event::KeyPressed { code, .. } => self.key_pressed(code),
-                    Event::KeyReleased { code, .. } => self.command.key_released(code),
+                    Event::KeyReleased { code, .. } => self.command_win.key_released(code),
                     Event::MouseWheelScrolled { delta, .. } => {
                         if delta > 0.0 {
                             self.scroll(ScrollType::MouseWheelUp);
@@ -143,14 +143,14 @@ impl App<'_> {
                 self.handle_exec_messages(message);
             }
 
-            if self.main_text.must_draw()
-                || self.status_line.must_draw()
-                || self.command.must_draw()
+            if self.main_win.must_draw()
+                || self.status_win.must_draw()
+                || self.command_win.must_draw()
             {
                 self.window.clear(Color::BLACK);
-                self.main_text.draw(&mut self.window, &self.font);
-                self.status_line.draw(&mut self.window, &self.font);
-                self.command.draw(&mut self.window, &self.font);
+                self.main_win.draw(&mut self.window, &self.font);
+                self.status_win.draw(&mut self.window, &self.font);
+                self.command_win.draw(&mut self.window, &self.font);
 
                 self.window.display();
             }
@@ -164,14 +164,15 @@ impl App<'_> {
     }
 
     fn set_active(&mut self, active: bool) {
-        let old_state = self.command.get_cursor_state();
-        self.command.set_cursor_state(match (old_state, active) {
-            (text::CursorState::NormalActive, false) => text::CursorState::NormalInactive,
-            (text::CursorState::NormalInactive, true) => text::CursorState::NormalActive,
-            (text::CursorState::InsertActive, false) => text::CursorState::InsertInactive,
-            (text::CursorState::InsertInactive, true) => text::CursorState::InsertActive,
-            (state, _) => state,
-        });
+        let old_state = self.command_win.get_cursor_state();
+        self.command_win
+            .set_cursor_state(match (old_state, active) {
+                (text::CursorState::NormalActive, false) => text::CursorState::NormalInactive,
+                (text::CursorState::NormalInactive, true) => text::CursorState::NormalActive,
+                (text::CursorState::InsertActive, false) => text::CursorState::InsertInactive,
+                (text::CursorState::InsertInactive, true) => text::CursorState::InsertActive,
+                (state, _) => state,
+            });
     }
 
     fn resize_event(&mut self, width: i32, height: i32) {
@@ -185,22 +186,22 @@ impl App<'_> {
     fn set_window_sizes(&mut self, width: i32, height: i32) {
         let font_height = self.font.char_size.y * self.font_scale;
 
-        self.main_text.set_position_size(
+        self.main_win.set_position_size(
             Vector2i::new(0, 0),
             Vector2i::new(width, height - font_height * 2),
         );
-        self.status_line.set_position_size(
+        self.status_win.set_position_size(
             Vector2i::new(0, height - font_height * 2),
             Vector2i::new(width, font_height),
         );
-        self.command.set_position_size(
+        self.command_win.set_position_size(
             Vector2i::new(0, height - font_height),
             Vector2i::new(width, font_height),
         );
     }
 
     fn key_pressed(&mut self, code: Key) {
-        if self.command.mode == edit::Mode::Normal {
+        if self.command_win.mode == edit::Mode::Normal {
             self.normal_mode_key_pressed(code);
         } else {
             self.insert_mode_key_pressed(code);
@@ -208,11 +209,11 @@ impl App<'_> {
     }
 
     fn insert_mode_key_pressed(&mut self, code: Key) {
-        if self.command.control {
+        if self.command_win.control {
             match code {
                 Key::C => self.kill_job(),
                 Key::D => self.send_eof(),
-                _ => self.command.key_pressed(code),
+                _ => self.command_win.key_pressed(code),
             }
         } else {
             match code {
@@ -221,20 +222,20 @@ impl App<'_> {
                 Key::Down => self.scroll(ScrollType::CursorDown),
                 Key::PageUp => self.scroll(ScrollType::PageUp),
                 Key::PageDown => self.scroll(ScrollType::PageDown),
-                _ => self.command.key_pressed(code),
+                _ => self.command_win.key_pressed(code),
             }
         }
     }
 
     fn normal_mode_key_pressed(&mut self, code: Key) {
         let old_idx = self.browse_job_history_idx as i32;
-        let old_command = self.command.get_text()[0].clone();
+        let old_command = self.command_win.get_text()[0].clone();
         let mut update_job_idx = |delta: i32| {
             if self.jobs.is_empty() {
                 return;
             }
             if old_command.is_empty() {
-                self.command
+                self.command_win
                     .replace(vec![self.jobs[old_idx as usize].args_printable()]);
                 return;
             }
@@ -256,18 +257,18 @@ impl App<'_> {
                 }
                 idx += delta;
             }
-            self.command.replace(vec![new_command]);
+            self.command_win.replace(vec![new_command]);
         };
 
         match code {
             Key::Enter => {
                 self.run_command();
-                self.command.set_mode(edit::Mode::Insert);
+                self.command_win.set_mode(edit::Mode::Insert);
             }
             Key::Escape => self.window.close(),
             Key::K => update_job_idx(-1),
             Key::J => update_job_idx(1),
-            _ => self.command.key_pressed(code),
+            _ => self.command_win.key_pressed(code),
         }
     }
 
@@ -284,16 +285,16 @@ impl App<'_> {
             ScrollType::MouseWheelDown => 4,
         };
 
-        self.main_text.scroll_pos_y += scroll_amount;
-        let text_line_count = self.main_text.text.len() as i32;
+        self.main_win.scroll_pos_y += scroll_amount;
+        let text_line_count = self.main_win.text.len() as i32;
 
-        if self.main_text.scroll_pos_y > 0 || text_line_count <= main_window_line_count {
-            self.main_text.scroll_pos_y = 0;
-        } else if -self.main_text.scroll_pos_y > text_line_count - main_window_line_count {
-            self.main_text.scroll_pos_y = -text_line_count + main_window_line_count;
+        if self.main_win.scroll_pos_y > 0 || text_line_count <= main_window_line_count {
+            self.main_win.scroll_pos_y = 0;
+        } else if -self.main_win.scroll_pos_y > text_line_count - main_window_line_count {
+            self.main_win.scroll_pos_y = -text_line_count + main_window_line_count;
         }
 
-        self.main_text.redraw = true;
+        self.main_win.redraw = true;
     }
 
     fn update_pwd_directory(&mut self) {
@@ -305,7 +306,7 @@ impl App<'_> {
         } else {
             format!("{}", pwd.display())
         };
-        self.status_line.replace(vec![text]);
+        self.status_win.replace(vec![text]);
 
         let mut dir_adorned = String::new();
         let mut dir_plain = String::new();
@@ -327,8 +328,8 @@ impl App<'_> {
     fn run_command(&mut self) {
         let pwd = std::env::current_dir().unwrap();
 
-        self.main_text.scroll_pos_y = 0;
-        let command = self.command.replace(vec![]);
+        self.main_win.scroll_pos_y = 0;
+        let command = self.command_win.replace(vec![]);
         if self.stdin_tx.is_some() {
             let send_string = if !command.is_empty() && !command[0].trim().is_empty() {
                 format!("{}\n", command[0])
@@ -360,7 +361,7 @@ impl App<'_> {
             let job_id = self.jobs.len();
             self.browse_job_history_idx = job_id;
 
-            self.main_text.write(&format!(
+            self.main_win.write(&format!(
                 "{}{}{} {}> {}{}\n",
                 self.colors.bg("Yellow"),
                 self.colors.fg("Black"),
@@ -374,7 +375,7 @@ impl App<'_> {
         }
     }
 
-    fn write_intermediate_status_line(&mut self) {
+    fn write_intermediate_status_win(&mut self) {
         let job = self.jobs.last().unwrap();
         let command = job.args_printable();
         let return_code = job.return_code.unwrap();
@@ -387,10 +388,10 @@ impl App<'_> {
         let fg = colors.fg("Black");
         let reset = colors.reset();
 
-        let main_text_window_width =
-            self.main_text.get_size().x / (self.font.char_size.x * self.font_scale);
-        let spaces = if main_text_window_width as usize > command.len() {
-            " ".repeat(main_text_window_width as usize - command.len())
+        let main_win_window_width =
+            self.main_win.get_size().x / (self.font.char_size.x * self.font_scale);
+        let spaces = if main_win_window_width as usize > command.len() {
+            " ".repeat(main_win_window_width as usize - command.len())
         } else {
             "".to_string()
         };
@@ -399,12 +400,12 @@ impl App<'_> {
             (Some(start), Some(end)) => {
                 let duration = end.duration_since(start).unwrap();
                 let duration = format!("{}.{:03}s", duration.as_secs(), duration.subsec_millis());
-                self.main_text.write(&format!(
+                self.main_win.write(&format!(
                     "\n{}{}`{}` returned {} in {}{}{}\n",
                     bg, fg, command, return_code, duration, spaces, reset,
                 ));
             }
-            _ => self.main_text.write(&format!(
+            _ => self.main_win.write(&format!(
                 "\n{}{}`{}` returned {}{}{}\n",
                 bg, fg, command, return_code, spaces, reset,
             )),
@@ -417,18 +418,18 @@ impl App<'_> {
         match message {
             ExecMessage::StdInQueue(tx) => {
                 self.stdin_tx = Some(tx);
-                self.command
+                self.command_win
                     .set_background_color(self.command_bg_color_running);
             }
             ExecMessage::StdOut(output) | ExecMessage::StdErr(output) => {
-                self.main_text.write(&output);
-                self.main_text.redraw = true;
+                self.main_win.write(&output);
+                self.main_win.redraw = true;
             }
             ExecMessage::JobDone(job) => {
                 self.end_job();
                 self.jobs.push(job);
                 self.update_pwd_directory();
-                self.write_intermediate_status_line();
+                self.write_intermediate_status_win();
             }
             ExecMessage::BuiltinCommand(cmd) => self.handle_builtin_command(cmd),
         }
@@ -442,7 +443,7 @@ impl App<'_> {
 
     fn send_eof(&mut self) {
         self.stdin_tx = None;
-        self.command
+        self.command_win
             .set_background_color(self.command_bg_color_normal);
     }
 
