@@ -50,6 +50,7 @@ impl Builtin {
         match job.args[0].as_str() {
             "cd" => Builtin::cmd_cd(tx, job),
             "jobs" => Builtin::cmd_jobs(tx, job),
+            "yes" => Builtin::cmd_yes(tx, job),
             _ => Builtin::cmd_run_exec(tx, job),
         }
     }
@@ -98,6 +99,13 @@ impl Builtin {
         job.start();
         tx.send(ExecMessage::BuiltinCommand(BuiltinCommand::Jobs))
             .unwrap();
+        job.return_code = Some(0);
+        None
+    }
+
+    fn cmd_yes(tx: mpsc::Sender<ExecMessage>, mut job: Job) -> Option<Arc<AtomicBool>> {
+        job.start();
+        tx.send(ExecMessage::StdOut("y".to_string())).unwrap();
         job.return_code = Some(0);
         None
     }
