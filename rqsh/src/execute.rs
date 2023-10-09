@@ -5,6 +5,8 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
 
+use crate::args;
+
 pub struct Job {
     pub args: Vec<String>,
     pub return_code: Option<i32>,
@@ -23,24 +25,8 @@ impl Job {
     }
 
     pub fn args_printable(&self) -> String {
-        let mut s = String::new();
-        for arg in &self.args {
-            let mut arg_quotes = String::new();
-            for c in arg.chars() {
-                if c == '"' {
-                    arg_quotes.push('\\');
-                }
-                arg_quotes.push(c);
-            }
-
-            if arg_quotes.contains(' ') {
-                s.push_str(&format!("\"{}\" ", arg_quotes));
-            } else {
-                s.push_str(&format!("{} ", arg_quotes));
-            }
-        }
-        s.pop();
-        s
+        let args = args::Args::from_vec(self.args.clone());
+        args.printable()
     }
 
     pub fn start(&mut self) {

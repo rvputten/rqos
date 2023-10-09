@@ -26,6 +26,10 @@ pub struct App<'a> {
     main_win: text::Text<'a>,
     status_win: text::Text<'a>,
     command_win: edit::Edit,
+    info_win: text::Text<'a>,
+    info_command_tmp: String,
+    info_text: Vec<String>,
+    info_text_selection: Option<usize>,
     command_bg_color_normal: Color,
     command_bg_color_running: Color,
     window: RenderWindow,
@@ -91,6 +95,11 @@ impl App<'_> {
             .cursor_colors(Color::BLACK, yellow)
             .build();
 
+        let info_win = text::TextBuilder::new()
+            .fg_color(Color::BLACK)
+            .bg_color(Color::WHITE)
+            .build();
+
         let (tx, rx) = mpsc::channel();
         let mut app = Self {
             font,
@@ -100,6 +109,10 @@ impl App<'_> {
             command_win,
             command_bg_color_normal,
             command_bg_color_running,
+            info_win,
+            info_command_tmp: String::new(),
+            info_text: Vec::new(),
+            info_text_selection: None,
             window,
             dir_plain: Vec::new(),
             jobs: Vec::new(),
@@ -146,11 +159,13 @@ impl App<'_> {
             if self.main_win.must_draw()
                 || self.status_win.must_draw()
                 || self.command_win.must_draw()
+                || self.info_win.must_draw()
             {
                 self.window.clear(Color::BLACK);
                 self.main_win.draw(&mut self.window, &self.font);
                 self.status_win.draw(&mut self.window, &self.font);
                 self.command_win.draw(&mut self.window, &self.font);
+                self.info_win.draw(&mut self.window, &self.font);
 
                 self.window.display();
             }
@@ -186,17 +201,31 @@ impl App<'_> {
     fn set_window_sizes(&mut self, width: i32, height: i32) {
         let font_height = self.font.char_size.y * self.font_scale;
 
+        let status_win_height = font_height;
+        let command_win_height = font_height;
+        let info_win_height = font_height * 3;
+        let main_win_height = height - status_win_height - command_win_height - info_win_height;
+
+        let main_win_pos_y = 0;
+        let status_win_pos_y = main_win_height;
+        let command_win_pos_y = main_win_height + status_win_height;
+        let info_win_pos_y = main_win_height + status_win_height + command_win_height;
+
         self.main_win.set_position_size(
-            Vector2i::new(0, 0),
-            Vector2i::new(width, height - font_height * 2),
+            Vector2i::new(0, main_win_pos_y),
+            Vector2i::new(width, main_win_height),
         );
         self.status_win.set_position_size(
-            Vector2i::new(0, height - font_height * 2),
-            Vector2i::new(width, font_height),
+            Vector2i::new(0, status_win_pos_y),
+            Vector2i::new(width, status_win_height),
         );
         self.command_win.set_position_size(
-            Vector2i::new(0, height - font_height),
-            Vector2i::new(width, font_height),
+            Vector2i::new(0, command_win_pos_y),
+            Vector2i::new(width, command_win_height),
+        );
+        self.info_win.set_position_size(
+            Vector2i::new(0, info_win_pos_y),
+            Vector2i::new(width, info_win_height),
         );
     }
 
@@ -206,18 +235,36 @@ impl App<'_> {
         } else {
             self.insert_mode_key_pressed(code);
         }
+        self.update_info_win();
     }
 
     fn insert_mode_key_pressed(&mut self, code: Key) {
+        let mut change_selection = |delta: i32| {
+            if let Some(old_selection) = self.info_text_selection {
+                let mut new_selection = (old_selection as i32 + delta).max(0) as usize;
+                while new_selection >= self.info_text.len()
+                    || self.info_text[new_selection].is_empty()
+                {
+                    new_selection -= 1;
+                }
+                self.info_text_selection = Some(new_selection);
+            } else {
+                self.info_text_selection = Some(0);
+            }
+        };
+
         if self.command_win.control {
             match code {
                 Key::C => self.kill_job(),
                 Key::D => self.send_eof(),
+                Key::N => change_selection(1),
+                Key::P => change_selection(-1),
                 _ => self.command_win.key_pressed(code),
             }
         } else {
             match code {
-                Key::Enter => self.run_command(),
+                Key::Tab => self.on_tab(),
+                Key::Enter => self.on_enter(),
                 Key::Up => self.scroll(ScrollType::CursorUp),
                 Key::Down => self.scroll(ScrollType::CursorDown),
                 Key::PageUp => self.scroll(ScrollType::PageUp),
@@ -297,6 +344,100 @@ impl App<'_> {
         self.main_win.redraw = true;
     }
 
+    fn create_info_text(&self) -> Vec<String> {
+        let command_text = self.command_win.get_text()[0].clone();
+        let args = Args::new_notrim(&command_text).args;
+
+        let len = args.len();
+        match len {
+            0 => self.jobs.iter().rev().map(|j| j.args_printable()).collect(),
+            1 => {
+                let arg = &args[0];
+                let mut matches = vec![];
+                for job in self.jobs.iter().rev() {
+                    if job.args_printable().starts_with(arg) {
+                        matches.push(job.args_printable());
+                    }
+                }
+                matches
+            }
+            _ => {
+                let last_arg = &format!("{}*", args[len - 1]);
+                let glob = Glob::from_path(".").unwrap();
+                glob.match_path_multiple(last_arg)
+            }
+        }
+    }
+
+    fn reset_info_win(&mut self) {
+        self.info_text = vec![];
+        self.info_text_selection = None;
+        self.info_win.redraw = true;
+        self.info_command_tmp = self.command_win.get_text()[0].clone();
+    }
+
+    fn check_info_change(&mut self) {
+        let command = self.command_win.get_text()[0].clone();
+        if command == self.info_command_tmp {
+            return;
+        }
+        self.reset_info_win();
+    }
+
+    fn update_info_win(&mut self) {
+        self.check_info_change();
+        let len = self.info_text.len();
+        if len == 0 {
+            self.info_text = self.create_info_text();
+        }
+        let info_text_lines = 3;
+        let add_empty_lines =
+            (info_text_lines - self.info_text.len() % info_text_lines) % info_text_lines;
+        self.info_text.extend(vec![String::new(); add_empty_lines]);
+
+        let max_len: usize = 60;
+        let many_spaces = " ".repeat(max_len);
+
+        let len = self.info_text.len();
+        let mut lines = vec![String::new(); info_text_lines];
+        let highlight_color_bg = self.colors.bg("Light Blue");
+        let highlight_color_fg = self.colors.fg("White");
+        let reset = self.colors.reset();
+        let selection = self.info_text_selection.unwrap_or(len + 1); // len+1 is never reached, so
+                                                                     // acts as "no selection"
+        for idx in (0..len).step_by(info_text_lines) {
+            let max_cnt = self.info_text[idx..idx + info_text_lines]
+                .iter()
+                .map(|s| s.len())
+                .max()
+                .unwrap()
+                + 1;
+            let max_cnt = max_cnt.min(max_len);
+            for (i, line) in self.info_text[idx..idx + info_text_lines]
+                .iter()
+                .enumerate()
+            {
+                let line = if line.len() > max_len - 1 {
+                    format!("{}...", &line[..max_len - 4])
+                } else {
+                    line.clone()
+                };
+                let extra_spaces = &many_spaces[..max_cnt - line.len()];
+                if idx + i == selection {
+                    lines[i] += &format!(
+                        "{}{}{}{}{}",
+                        highlight_color_bg, highlight_color_fg, line, extra_spaces, reset
+                    );
+                } else {
+                    lines[i] += &line;
+                    lines[i] += extra_spaces;
+                }
+            }
+        }
+
+        self.info_win.replace(lines);
+    }
+
     fn update_pwd_directory(&mut self) {
         let pwd = std::env::current_dir().unwrap();
         let text = if let Some(job) = self.jobs.last() {
@@ -323,6 +464,31 @@ impl App<'_> {
         }
         self.dir_plain = dir_plain.lines().map(|s| s.to_string()).collect();
         self.dir_plain.sort();
+
+        self.update_info_win();
+    }
+
+    fn on_tab(&mut self) {
+        let selection = self.info_text_selection.unwrap_or(0);
+        let command = self.command_win.get_text()[0].clone();
+        let mut args = Args::new_notrim(&command);
+        if !self.info_text.is_empty() {
+            let additional_args = Args::new(&self.info_text[selection]);
+            if !args.args.is_empty() {
+                args.args.pop();
+            }
+            args.args.extend(additional_args.args);
+            let new_command = args.printable();
+            self.command_win.replace(vec![new_command]);
+            self.reset_info_win();
+        }
+    }
+
+    fn on_enter(&mut self) {
+        if self.info_text_selection.is_some() {
+            self.on_tab();
+        }
+        self.run_command();
     }
 
     fn run_command(&mut self) {
@@ -373,6 +539,7 @@ impl App<'_> {
 
             self.stop_thread = Builtin::run(self.tx.clone(), job);
         }
+        self.update_info_win();
     }
 
     fn write_intermediate_status_win(&mut self) {
@@ -430,6 +597,8 @@ impl App<'_> {
                 self.jobs.push(job);
                 self.update_pwd_directory();
                 self.write_intermediate_status_win();
+                self.reset_info_win();
+                self.update_info_win();
             }
             ExecMessage::BuiltinCommand(cmd) => self.handle_builtin_command(cmd),
         }
@@ -448,7 +617,6 @@ impl App<'_> {
     }
 
     fn kill_job(&mut self) {
-        println!("killing job with stop_thread: {:?}", self.stop_thread);
         if let Some(stop_thread) = self.stop_thread.take() {
             stop_thread.store(true, Ordering::SeqCst);
         }
