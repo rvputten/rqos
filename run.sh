@@ -43,6 +43,11 @@ pid=`ps -eo pid,comm|grep -w "$exe_name"|awk '{print $1}'`
 [[ -n $pid ]] && { echo "Kill $pid"; kill $pid; }
 
 cargo fmt
+
+cargo run -p $exe_name --color=always
+r=$?
+[[ "$r" -ne 0 ]] && wait_and_run
+
 cargo clippy --color=always -- -D warnings 2>&1 | scan_error_code_first_40_lines | tee error.txt
 r=$?
 error_to_clipboard clippy
@@ -64,5 +69,5 @@ error_to_clipboard tests
 
 
 rg --color=always '#\[allow\((dead_code|unused_variables)\)\]'
-unbuffer cargo run -p $exe_name --color=always &
+#unbuffer cargo run -p $exe_name --color=always &
 wait_and_run
