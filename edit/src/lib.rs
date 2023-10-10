@@ -121,6 +121,10 @@ impl Edit {
         self.text.set_position_size(position, size);
     }
 
+    pub fn get_cursor(&self) -> Vector2i {
+        self.text.cursor_position
+    }
+
     pub fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
         let old_state = self.text.get_cursor_state();
