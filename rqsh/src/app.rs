@@ -27,9 +27,11 @@ pub struct App<'a> {
     status_win: text::Text<'a>,
     command_win: edit::Edit,
     info_win: text::Text<'a>,
+    info_active: bool,
     info_command_tmp: String,
     info_text: Vec<String>,
-    info_text_selection: Option<usize>,
+    info_selection: usize,
+    info_cursor_x: usize,
     command_bg_color_normal: Color,
     command_bg_color_running: Color,
     window: RenderWindow,
@@ -112,7 +114,9 @@ impl App<'_> {
             info_win,
             info_command_tmp: String::new(),
             info_text: Vec::new(),
-            info_text_selection: None,
+            info_selection: 0,
+            info_cursor_x: 0,
+            info_active: false,
             window,
             dir_plain: Vec::new(),
             jobs: Vec::new(),
@@ -239,31 +243,18 @@ impl App<'_> {
     }
 
     fn insert_mode_key_pressed(&mut self, code: Key) {
-        let mut change_selection = |delta: i32| {
-            if let Some(old_selection) = self.info_text_selection {
-                let mut new_selection = (old_selection as i32 + delta).max(0) as usize;
-                while new_selection >= self.info_text.len()
-                    || self.info_text[new_selection].is_empty()
-                {
-                    new_selection -= 1;
-                }
-                self.info_text_selection = Some(new_selection);
-            } else {
-                self.info_text_selection = Some(0);
-            }
-        };
-
         if self.command_win.control {
             match code {
                 Key::C => self.kill_job(),
                 Key::D => self.send_eof(),
-                Key::N => change_selection(1),
-                Key::P => change_selection(-1),
+                Key::N => self.change_selection(1),
+                Key::P => self.change_selection(-1),
                 _ => self.command_win.key_pressed(code),
             }
         } else {
+            let tab_dir = if self.command_win.shift { -1 } else { 1 };
             match code {
-                Key::Tab => self.on_tab(),
+                Key::Tab => self.change_selection(tab_dir),
                 Key::Enter => self.on_enter(),
                 Key::Up => self.scroll(ScrollType::CursorUp),
                 Key::Down => self.scroll(ScrollType::CursorDown),
@@ -369,15 +360,36 @@ impl App<'_> {
         }
     }
 
+    fn change_selection(&mut self, delta: i32) {
+        if !self.info_active {
+            self.info_active = true;
+            self.info_command_tmp = self.command_win.get_text()[0].clone();
+            self.info_selection = 0;
+            self.info_cursor_x = self.info_command_tmp.len();
+        } else {
+            self.info_selection = (self.info_selection as i32 + delta)
+                .max(0)
+                .min(self.info_text.len() as i32 - 1) as usize;
+            // remove padded lines
+            while self.info_selection > 0 && self.info_text[self.info_selection].is_empty() {
+                self.info_selection -= 1;
+            }
+        }
+    }
+
     fn reset_info_win(&mut self) {
         self.info_text = vec![];
-        self.info_text_selection = None;
         self.info_win.redraw = true;
         self.info_command_tmp = self.command_win.get_text()[0].clone();
+        self.info_active = false;
     }
 
     fn check_info_change(&mut self) {
-        let command = self.command_win.get_text()[0].clone();
+        let command = if self.command_win.get_text().is_empty() {
+            "".to_string()
+        } else {
+            self.command_win.get_text()[0].clone()
+        };
         if command == self.info_command_tmp {
             return;
         }
@@ -403,8 +415,6 @@ impl App<'_> {
         let highlight_color_bg = self.colors.bg("Light Blue");
         let highlight_color_fg = self.colors.fg("White");
         let reset = self.colors.reset();
-        let selection = self.info_text_selection.unwrap_or(len + 1); // len+1 is never reached, so
-                                                                     // acts as "no selection"
         for idx in (0..len).step_by(info_text_lines) {
             let max_cnt = self.info_text[idx..idx + info_text_lines]
                 .iter()
@@ -423,7 +433,7 @@ impl App<'_> {
                     line.clone()
                 };
                 let extra_spaces = &many_spaces[..max_cnt - line.len()];
-                if idx + i == selection {
+                if self.info_active && idx + i == self.info_selection {
                     lines[i] += &format!(
                         "{}{}{}{}{}",
                         highlight_color_bg, highlight_color_fg, line, extra_spaces, reset
@@ -468,25 +478,23 @@ impl App<'_> {
         self.update_info_win();
     }
 
-    fn on_tab(&mut self) {
-        let selection = self.info_text_selection.unwrap_or(0);
-        let command = self.command_win.get_text()[0].clone();
-        let mut args = Args::new_notrim(&command);
-        if !self.info_text.is_empty() {
-            let additional_args = Args::new(&self.info_text[selection]);
-            if !args.args.is_empty() {
-                args.args.pop();
-            }
-            args.args.extend(additional_args.args);
-            let new_command = args.printable();
-            self.command_win.replace(vec![new_command]);
-            self.reset_info_win();
-        }
-    }
-
     fn on_enter(&mut self) {
-        if self.info_text_selection.is_some() {
-            self.on_tab();
+        if self.info_active {
+            self.info_active = false;
+
+            let mut args = Args::new_notrim(&self.info_command_tmp);
+            let selection = self.info_text[self.info_selection].clone();
+            let command = match args.args.len() {
+                0 | 1 => selection,
+                _ => {
+                    args.args.pop();
+                    args.args.push(selection);
+                    args.printable()
+                }
+            };
+            self.command_win.replace(vec![command]);
+        } else {
+            self.reset_info_win();
         }
         self.run_command();
     }
@@ -496,15 +504,19 @@ impl App<'_> {
 
         self.main_win.scroll_pos_y = 0;
         let command = self.command_win.replace(vec![]);
+        let command = if command.is_empty() {
+            "".to_string()
+        } else {
+            command[0].trim().to_string()
+        };
         if self.stdin_tx.is_some() {
-            let send_string = if !command.is_empty() && !command[0].trim().is_empty() {
-                format!("{}\n", command[0])
+            let send_string = if !command.trim().is_empty() {
+                format!("{}\n", command)
             } else {
                 "\n".to_string()
             };
             self.stdin_tx.as_ref().unwrap().send(send_string).unwrap();
-        } else if !command.is_empty() && !command[0].trim().is_empty() {
-            let command = command[0].trim().to_string();
+        } else {
             let args = Args::new(&command).args;
             let glob = Glob::from_path(".").unwrap();
             let mut expanded_args = glob.match_path_single(&args[0]);
