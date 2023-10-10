@@ -39,14 +39,13 @@ function wait_and_run() {
   exec ./run.sh "$exe_name"
 }
 
-pid=`ps -eo pid,comm|grep -w "$exe_name"|awk '{print $1}'`
-[[ -n $pid ]] && { echo "Kill $pid"; kill $pid; }
+#pid=`cat .pid 2>/dev/null`
+#[[ -n $pid ]] && { echo "Killing $pid"; kill $pid; }
 
 cargo fmt
 
 cargo run -p $exe_name --color=always
-r=$?
-[[ "$r" -ne 0 ]] && wait_and_run
+echo $! > .pid
 
 cargo clippy --color=always -- -D warnings 2>&1 | scan_error_code_first_40_lines | tee error.txt
 r=$?
