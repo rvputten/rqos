@@ -133,6 +133,7 @@ impl App<'_> {
     }
 
     pub fn run(&mut self) {
+        let mut frame_counter = 0;
         while self.window.is_open() {
             let t = std::time::Instant::now();
             while let Some(event) = self.window.poll_event() {
@@ -164,6 +165,7 @@ impl App<'_> {
                 || self.status_win.must_draw()
                 || self.command_win.must_draw()
                 || self.info_win.must_draw()
+                || frame_counter > 200
             {
                 self.window.clear(Color::BLACK);
                 self.main_win.draw(&mut self.window, &self.font);
@@ -172,7 +174,9 @@ impl App<'_> {
                 self.info_win.draw(&mut self.window, &self.font);
 
                 self.window.display();
+                frame_counter = 0;
             }
+            frame_counter += 1;
 
             let elapsed = t.elapsed();
             let frame_diff = 16 - elapsed.as_millis() as i32;
