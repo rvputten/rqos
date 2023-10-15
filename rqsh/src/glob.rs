@@ -24,6 +24,7 @@ impl Glob {
                 ));
             }
         }
+        source.sort();
         Ok(Glob::from_vec_string(source, path))
     }
 
@@ -86,26 +87,23 @@ impl Glob {
     //   - but not ["file1", "subdir2/subdir3/file5"]
     // - pattern starts with the pattern to be matched
     pub fn match_path_multiple(&self, pattern: &str) -> Vec<String> {
+        println!("match_path_multiple({})", pattern);
         if let Some(stripped) = pattern.strip_prefix('/') {
-            let mut parts = stripped.splitn(2, '/');
-            let here = format!("/{}", parts.next().unwrap());
-            let glob = Glob::from_path(&here).unwrap();
-            if let Some(remaining_match_path) = parts.next() {
-                glob.match_path_multiple(remaining_match_path)
+            let glob = Glob::from_path("/").unwrap();
+            if stripped.is_empty() {
+                vec![]
             } else {
-                vec![here]
+                glob.match_path_multiple(stripped)
             }
         } else {
             let mut parts = pattern.splitn(2, '/');
             let here = parts.next().unwrap();
             let matched_here = self.match_path_single(here);
 
-            let path_join = |s1: &str, s2: &str| {
-                if s1 == "." {
-                    s2.to_string()
-                } else {
-                    format!("{}/{}", s1, s2)
-                }
+            let path_join = |s1: &str, s2: &str| match s1 {
+                "." => s2.to_string(),
+                "/" => format!("/{}", s2),
+                _ => format!("{}/{}", s1, s2),
             };
 
             // if there is a '/' in the pattern, we need to match the rest of the pattern in the
@@ -143,7 +141,7 @@ impl Glob {
             } else {
                 matched_here
                     .iter()
-                    .map(|s| format!("{}/{}", self.parent, s))
+                    .map(|s| path_join(&self.parent, s))
                     .collect()
             }
         }
@@ -242,6 +240,7 @@ mod tests {
         assert_sorted("subdir2/subsubdir1/file5", vec!["subdir2/subsubdir1/file5"]);
         assert_sorted("subdir2/subsubdir1/file6", empty);
         assert_sorted("/tmp", vec!["/tmp"]);
+        assert_sorted("./file*", vec!["./file1", "./file2"]);
         assert_sorted(&dir, vec![&dir]);
         assert_sorted(
             &format!("{}/subdir*", dir),
