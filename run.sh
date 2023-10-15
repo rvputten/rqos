@@ -44,8 +44,15 @@ function wait_and_run() {
 
 cargo fmt
 
+cargo build -p $exe_name --color=always 2>&1 | scan_error_code_first_40_lines | tee error.txt
+r=$?
+error_to_clipboard build
+[[ "$r" -ne 0 ]] && wait_and_run
+
 cargo run -p $exe_name --color=always
+r=$?
 echo $! > .pid
+[[ "$r" -ne 0 ]] && wait_and_run
 
 cargo clippy --color=always -- -D warnings 2>&1 | scan_error_code_first_40_lines | tee error.txt
 r=$?
