@@ -15,4 +15,3 @@ To do
   - app/input.rs
   - app/window.rs
 - redirect output with '>'
-- window not repainting when inactive
