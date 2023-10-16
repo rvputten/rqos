@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sfml = "0.21"
-font = { path = "../font" }
-text = { path = "../text" }
+sfml.workspace=true
+font.workspace = true
+text.workspace = true

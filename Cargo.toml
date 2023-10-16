@@ -34,3 +34,10 @@ font = { path = "font" }
 text = { path = "text" }
 edit = { path = "edit" }
 color = { path = "color" }
+
+[workspace.dependencies]
+sfml = "0.21"
+font = { path = "font" }
+text = { path = "text" }
+edit = { path = "edit" }
+color = { path = "color" }

@@ -6,6 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sfml = "0.21"
-font = { path = "../font" }
-color = { path = "../color" }
+sfml.workspace = true
+font.workspace = true
+color.workspace = true
