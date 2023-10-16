@@ -31,12 +31,12 @@ function error_to_clipboard() {
 }
 
 function wait_and_run() {
-  echo "ret: $r"
-  echo --------------------------------------------------------------------------------
-  inotifywait -q -e close_write */src Cargo.toml */Cargo.toml resources/*.{frag,sh}
-  clear
+    echo "ret: $r"
+    echo --------------------------------------------------------------------------------
+    inotifywait -q -e close_write */src Cargo.toml */Cargo.toml resources/*.frag scripts/*.sh
+    clear
 
-  exec ./run.sh "$exe_name"
+    exec ./run.sh "$exe_name"
 }
 
 #pid=`cat .pid 2>/dev/null`
