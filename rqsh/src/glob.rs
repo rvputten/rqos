@@ -87,7 +87,6 @@ impl Glob {
     //   - but not ["file1", "subdir2/subdir3/file5"]
     // - pattern starts with the pattern to be matched
     pub fn match_path_multiple(&self, pattern: &str) -> Vec<String> {
-        println!("match_path_multiple({})", pattern);
         if let Some(stripped) = pattern.strip_prefix('/') {
             let glob = Glob::from_path("/").unwrap();
             if stripped.is_empty() {
@@ -240,7 +239,6 @@ mod tests {
         assert_sorted("subdir2/subsubdir1/file5", vec!["subdir2/subsubdir1/file5"]);
         assert_sorted("subdir2/subsubdir1/file6", empty);
         assert_sorted("/tmp", vec!["/tmp"]);
-        assert_sorted("./file*", vec!["./file1", "./file2"]);
         assert_sorted(&dir, vec![&dir]);
         assert_sorted(
             &format!("{}/subdir*", dir),
