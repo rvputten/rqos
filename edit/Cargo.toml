@@ -1,7 +1,11 @@
 [package]
 name = "edit"
-version = "0.1.0"
-edition = "2021"
+description = "Edit field"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 sfml.workspace=true

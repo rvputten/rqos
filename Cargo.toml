@@ -1,16 +1,6 @@
-[package]
-name = "rqos"
-version = "0.1.1"
-authors = ["Raoul van Putten <53082972+rvputten@users.noreply.github.com>"]
-edition = "2021"
-description = "Operating system on top of the Linux kernel and sfml"
-license = "MIT"
-repository = "https://github.com/rvputten/rqos.git"
-default-run = "rqsh"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [workspace]
+resolver = "2"
 members = [
     "font",
     "text",
@@ -20,20 +10,13 @@ members = [
     "rqsh",
 ]
 
-[[bin]]
-name = "rqsh"
-path = "rqsh/src/main.rs"
-
-[[bin]]
-name = "font_editor"
-path = "font_editor/src/main.rs"
-
-[dependencies]
-sfml = "0.21"
-font = { path = "font" }
-text = { path = "text" }
-edit = { path = "edit" }
-color = { path = "color" }
+[workspace.package]
+description = "Operating system on top of the Linux kernel and sfml"
+edition = "2021"
+version = "0.1.1"
+authors = ["Raoul van Putten <53082972+rvputten@users.noreply.github.com>"]
+license = "MIT"
+repository = "https://github.com/rvputten/rqos.git"
 
 [workspace.dependencies]
 sfml = "0.21"

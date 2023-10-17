@@ -1,15 +1,11 @@
 [package]
 name = "font"
-version = "0.1.1"
-edition = "2021"
-description = "A library to render fonts"
-license = "MIT"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-name = "font"
-path = "src/lib.rs"
+description = "rqos library to render fonts"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 sfml.workspace = true
