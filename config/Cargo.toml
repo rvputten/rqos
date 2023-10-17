@@ -1,12 +1,8 @@
 [package]
-name = "font"
-description = "rqos library to render fonts"
+name = "config"
+description = "rqos wide configuration settings"
 edition.workspace = true
 version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-
-[dependencies]
-sfml.workspace = true
-config.workspace = true

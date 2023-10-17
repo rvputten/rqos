@@ -2,12 +2,13 @@
 [workspace]
 resolver = "2"
 members = [
-    "font",
-    "text",
-    "edit",
     "color",
+    "config",
+    "edit",
+    "font",
     "font_editor",
     "rqsh",
+    "text",
 ]
 
 [workspace.package]
@@ -20,7 +21,8 @@ repository = "https://github.com/rvputten/rqos.git"
 
 [workspace.dependencies]
 sfml = "0.21"
+color = { path = "color" }
+config = { path = "config" }
+edit = { path = "edit" }
 font = { path = "font" }
 text = { path = "text" }
-edit = { path = "edit" }
-color = { path = "color" }

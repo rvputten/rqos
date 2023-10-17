@@ -9,5 +9,6 @@ repository.workspace = true
 
 [dependencies]
 sfml.workspace = true
-font.workspace = true
 color.workspace = true
+config.workspace = true
+font.workspace = true
