@@ -68,9 +68,7 @@ error_to_clipboard clippy_tests
 [[ -f .env ]] && source .env
 cargo test --workspace --color=always -- --nocapture 2>&1 | tee error.txt
 r=$?
-echo one
 [[ "$r" -ne 0 ]] && wait_and_run
-echo two
 error_to_clipboard tests
 
 
