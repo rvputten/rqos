@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 sfml.workspace = true
 color.workspace = true
+config.workspace = true
 text.workspace = true
 edit.workspace = true
 font.workspace = true

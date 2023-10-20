@@ -102,6 +102,8 @@ impl App<'_> {
             .bg_color(Color::WHITE)
             .build();
 
+        let jobs = App::load_jobs();
+
         let (tx, rx) = mpsc::channel();
         let mut app = Self {
             font,
@@ -119,7 +121,7 @@ impl App<'_> {
             info_active: false,
             window,
             dir_plain: Vec::new(),
-            jobs: Vec::new(),
+            jobs,
             browse_job_history_idx: 0,
             tx,
             rx,
@@ -306,6 +308,11 @@ impl App<'_> {
             Key::Enter => {
                 self.run_command();
                 self.command_win.set_mode(edit::Mode::Insert);
+            }
+            Key::D => {
+                if self.command_win.control {
+                    self.send_eof()
+                }
             }
             Key::K => update_job_idx(-1),
             Key::J => update_job_idx(1),
@@ -561,6 +568,7 @@ impl App<'_> {
 
     fn exit(&mut self) {
         self.window.close();
+        self.save_jobs();
     }
 
     fn write_intermediate_status_win(&mut self) {
@@ -655,5 +663,27 @@ impl App<'_> {
         self.stdin_tx = None;
         self.command_win
             .set_background_color(self.command_bg_color_normal);
+    }
+
+    pub fn load_jobs() -> Vec<Job> {
+        let mut jobs = Vec::new();
+        if let Ok(file_content) = config::Config::new().get_file("jobs.csv") {
+            for line in file_content.lines() {
+                let args = Args::new(line).args;
+                let job = Job::new(args);
+                jobs.push(job);
+            }
+        }
+        jobs
+    }
+
+    pub fn save_jobs(&self) {
+        let mut file_content = String::new();
+        for job in self.jobs.iter() {
+            file_content.push_str(&format!("{}\n", job.args_printable()));
+        }
+        config::Config::new()
+            .write_file("jobs.csv", &file_content)
+            .unwrap();
     }
 }

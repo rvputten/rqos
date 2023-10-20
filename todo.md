@@ -15,3 +15,4 @@ To do
   - app/input.rs
   - app/window.rs
 - redirect output with '>'
+- command line history

@@ -116,7 +116,7 @@ impl TextBuilder {
         let cursor_state = self.cursor_state.unwrap_or(CursorState::Hidden);
 
         let shader = Shader::from_file(
-            &config::get_resource_path("color_bold.frag"),
+            &config::Config::get_resource_path("color_bold.frag"),
             ShaderType::Fragment,
         )
         .unwrap();

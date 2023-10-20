@@ -58,7 +58,7 @@ impl Font {
     }
 
     fn filename(name: &str, char_size: Vector2i) -> String {
-        config::get_resource_path(&format!("{}_{}x{}.png", name, char_size.x, char_size.y))
+        config::Config::get_resource_path(&format!("{}_{}x{}.png", name, char_size.x, char_size.y))
     }
 
     pub fn load(name: &str, char_size: Vector2i) -> std::io::Result<Font> {
