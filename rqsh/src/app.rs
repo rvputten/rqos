@@ -138,7 +138,7 @@ impl App<'_> {
             let t = std::time::Instant::now();
             while let Some(event) = self.window.poll_event() {
                 match event {
-                    Event::Closed => self.window.close(),
+                    Event::Closed => self.exit(),
                     Event::KeyPressed { code, .. } => self.key_pressed(code),
                     Event::KeyReleased { code, .. } => self.command_win.key_released(code),
                     Event::MouseWheelScrolled { delta, .. } => {
@@ -307,7 +307,6 @@ impl App<'_> {
                 self.run_command();
                 self.command_win.set_mode(edit::Mode::Insert);
             }
-            Key::Escape => self.window.close(),
             Key::K => update_job_idx(-1),
             Key::J => update_job_idx(1),
             _ => self.command_win.key_pressed(code),
@@ -523,39 +522,45 @@ impl App<'_> {
         } else {
             let args = Args::new(&command).args;
             let glob = Glob::from_path(".").unwrap();
-            let mut expanded_args = glob.match_path_single(&args[0]);
-            if expanded_args.is_empty() {
-                expanded_args.push(args[0].to_string());
-            }
-            if args.len() > 1 {
-                for arg in args[1..].iter() {
-                    let g = glob.match_path_multiple(arg);
-                    if g.is_empty() {
-                        expanded_args.push(arg.to_string());
-                    } else {
-                        expanded_args.extend(g);
+            if !args.is_empty() {
+                let mut expanded_args = glob.match_path_single(&args[0]);
+                if expanded_args.is_empty() {
+                    expanded_args.push(args[0].to_string());
+                }
+                if args.len() > 1 {
+                    for arg in args[1..].iter() {
+                        let g = glob.match_path_multiple(arg);
+                        if g.is_empty() {
+                            expanded_args.push(arg.to_string());
+                        } else {
+                            expanded_args.extend(g);
+                        }
                     }
                 }
+
+                let job = Job::new(expanded_args);
+
+                let job_id = self.jobs.len();
+                self.browse_job_history_idx = job_id;
+
+                self.main_win.write(&format!(
+                    "{}{}{} {}> {}{}\n",
+                    self.colors.bg("Yellow"),
+                    self.colors.fg("Black"),
+                    job_id,
+                    pwd.display(),
+                    job.args_printable(),
+                    self.colors.reset()
+                ));
+
+                self.stop_thread = Builtin::run(self.tx.clone(), job);
             }
-
-            let job = Job::new(expanded_args);
-
-            let job_id = self.jobs.len();
-            self.browse_job_history_idx = job_id;
-
-            self.main_win.write(&format!(
-                "{}{}{} {}> {}{}\n",
-                self.colors.bg("Yellow"),
-                self.colors.fg("Black"),
-                job_id,
-                pwd.display(),
-                job.args_printable(),
-                self.colors.reset()
-            ));
-
-            self.stop_thread = Builtin::run(self.tx.clone(), job);
         }
         self.update_info_win();
+    }
+
+    fn exit(&mut self) {
+        self.window.close();
     }
 
     fn write_intermediate_status_win(&mut self) {
@@ -627,9 +632,17 @@ impl App<'_> {
     }
 
     fn send_eof(&mut self) {
-        self.stdin_tx = None;
-        self.command_win
-            .set_background_color(self.command_bg_color_normal);
+        let job_is_running = !self.jobs.is_empty() && self.jobs.last().unwrap().is_running();
+        if job_is_running {
+            self.end_job();
+        } else {
+            let command = &self.command_win.get_text()[0];
+            if command.is_empty() {
+                self.exit();
+            } else {
+                self.run_command();
+            }
+        }
     }
 
     fn kill_job(&mut self) {
@@ -639,6 +652,8 @@ impl App<'_> {
     }
 
     fn end_job(&mut self) {
-        self.send_eof();
+        self.stdin_tx = None;
+        self.command_win
+            .set_background_color(self.command_bg_color_normal);
     }
 }
