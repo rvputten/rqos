@@ -36,10 +36,6 @@ impl Job {
     pub fn end(&mut self) {
         self.end_time = Some(std::time::SystemTime::now());
     }
-
-    pub fn is_running(&self) -> bool {
-        self.start_time.is_some() && self.end_time.is_none()
-    }
 }
 
 pub enum BuiltinCommand {

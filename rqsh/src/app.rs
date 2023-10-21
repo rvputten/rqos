@@ -34,6 +34,7 @@ pub struct App<'a> {
     info_cursor_x: usize,
     command_bg_color_normal: Color,
     command_bg_color_running: Color,
+    command_is_running: bool,
     window: RenderWindow,
     dir_plain: Vec<String>,
     jobs: Vec<Job>,
@@ -113,6 +114,7 @@ impl App<'_> {
             command_win,
             command_bg_color_normal,
             command_bg_color_running,
+            command_is_running: false,
             info_win,
             info_command_tmp: String::new(),
             info_text: Vec::new(),
@@ -616,6 +618,7 @@ impl App<'_> {
                 self.stdin_tx = Some(tx);
                 self.command_win
                     .set_background_color(self.command_bg_color_running);
+                self.command_is_running = true;
             }
             ExecMessage::StdOut(output) | ExecMessage::StdErr(output) => {
                 self.main_win.write(&output);
@@ -640,16 +643,15 @@ impl App<'_> {
     }
 
     fn send_eof(&mut self) {
-        let job_is_running = !self.jobs.is_empty() && self.jobs.last().unwrap().is_running();
-        if job_is_running {
-            self.end_job();
-        } else {
-            let command = &self.command_win.get_text()[0];
-            if command.is_empty() {
-                self.exit();
-            } else {
-                self.run_command();
+        let user_input = &self.command_win.get_text()[0];
+        if self.command_is_running {
+            if user_input.is_empty() {
+                self.end_job();
             }
+        } else if user_input.is_empty() {
+            self.exit();
+        } else {
+            self.run_command();
         }
     }
 
@@ -663,6 +665,7 @@ impl App<'_> {
         self.stdin_tx = None;
         self.command_win
             .set_background_color(self.command_bg_color_normal);
+        self.command_is_running = false;
     }
 
     pub fn load_jobs() -> Vec<Job> {
