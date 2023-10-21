@@ -250,20 +250,27 @@ impl<'a> Text<'a> {
 
         let line_left = &line[..self.cursor_position.x as usize];
         let line_right = &line[self.cursor_position.x as usize..];
-        let mut line = line_left.chars().collect::<String>();
-        let mut lines_to_insert = Vec::new();
+        let mut line: Vec<char> = line_left.chars().collect();
+        let mut lines_to_insert: Vec<String> = Vec::new();
 
         for c in text.chars() {
-            if c == '\n' {
-                lines_to_insert.push(line);
-                line = String::new();
+            if c == '\r' {
+                self.cursor_position.x = 0;
+            } else if c == '\n' {
+                lines_to_insert.push(line.into_iter().collect::<String>());
+                line = vec![];
                 self.cursor_position.x = 0;
                 self.cursor_position.y += 1;
             } else {
-                line.push(c);
+                if line.len() > self.cursor_position.x as usize {
+                    line[self.cursor_position.x as usize] = c;
+                } else {
+                    line.push(c);
+                }
                 self.cursor_position.x += 1;
             }
         }
+        let mut line = line.into_iter().collect::<String>();
         line.push_str(line_right);
         lines_to_insert.push(line);
 
