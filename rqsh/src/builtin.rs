@@ -123,7 +123,7 @@ impl Builtin {
     pub fn jobs(tx: mpsc::Sender<ExecMessage>, jobs: &[Job]) {
         let mut v = vec![];
         for job in jobs {
-            if job.end_time.is_none() {
+            if job.start_time.is_some() && job.end_time.is_none() {
                 let t = std::time::SystemTime::now()
                     .duration_since(job.start_time.unwrap())
                     .unwrap();
