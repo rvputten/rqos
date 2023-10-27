@@ -76,6 +76,10 @@ impl Builtin {
             let path = &job.args[1];
             let path = if path == "-" {
                 std::env::var("OLDPWD").unwrap()
+            } else if path.starts_with("~") {
+                let home = std::env::var("HOME").unwrap();
+                let path = path.replace("~", &home);
+                path
             } else {
                 path.to_string()
             };
