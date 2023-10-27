@@ -121,6 +121,8 @@ impl TextBuilder {
         )
         .unwrap();
 
+        let ansi_colors = color::AnsiColor::new();
+
         Text {
             text: vec![String::new()],
             position,
@@ -131,6 +133,7 @@ impl TextBuilder {
             bg_color,
             cursor_insert_color,
             cursor_normal_color,
+            ansi_colors,
             bold,
             redraw: true,
             shader,
@@ -153,6 +156,7 @@ pub struct Text<'a> {
     pub vertical_alignment: VerticalAlignment,
     texture: RenderTexture,
     font_scale: i32,
+    ansi_colors: color::AnsiColor,
     fg_color: Color,
     bg_color: Color,
     cursor_insert_color: Color,
@@ -367,7 +371,6 @@ impl<'a> Text<'a> {
         partially_skipped_lines: i32,
         start_y: i32,
     ) {
-        let ansi_colors = color::AnsiColor::new();
         let font_width = font.char_size.x * self.font_scale;
         let font_height = font.char_size.y * self.font_scale;
         let bold_offset = if font.char_size.x > 12 { 2.0 } else { 1.0 }; // try to guess if font
@@ -375,8 +378,12 @@ impl<'a> Text<'a> {
 
         let font_texture_size = font.texture.size();
         self.shader.set_uniform_vec2(
-            "texture_size",
+            "atlas_size",
             Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
+        );
+        self.shader.set_uniform_vec2(
+            "sprite_size",
+            Vec2::new(font.char_size.x as f32, font.char_size.y as f32),
         );
 
         macro_rules! set_fg {
@@ -415,7 +422,7 @@ impl<'a> Text<'a> {
                 } else if *ch == 27 as char {
                     skipped_chars += 1;
                     let rest_of_line: String = line[x..].iter().collect();
-                    let (to_skip, codes) = ansi_colors.parse_ansi_color_code(&rest_of_line);
+                    let (to_skip, codes) = self.ansi_colors.parse_ansi_color_code(&rest_of_line);
                     skip_chars = to_skip;
                     if codes.is_empty() {
                         eprintln!(
@@ -426,16 +433,16 @@ impl<'a> Text<'a> {
                     for code in codes {
                         match code {
                             ColorType::Regular(color) => {
-                                set_fg!(ansi_colors.get_color_from_ansi(color).unwrap())
+                                set_fg!(self.ansi_colors.get_color_from_ansi(color).unwrap())
                             }
                             ColorType::HighIntensity(color) => {
-                                set_fg!(ansi_colors.get_color_from_ansi(color).unwrap())
+                                set_fg!(self.ansi_colors.get_color_from_ansi(color).unwrap())
                             }
                             ColorType::Background(color) => {
-                                set_bg!(ansi_colors.get_color_from_ansi(color).unwrap())
+                                set_bg!(self.ansi_colors.get_color_from_ansi(color).unwrap())
                             }
                             ColorType::BackgroundHighIntensity(color) => {
-                                set_bg!(ansi_colors.get_color_from_ansi(color).unwrap())
+                                set_bg!(self.ansi_colors.get_color_from_ansi(color).unwrap())
                             }
                             ColorType::ResetFg => set_fg!(self.fg_color),
                             ColorType::ResetBg => set_bg!(self.bg_color),
@@ -462,6 +469,13 @@ impl<'a> Text<'a> {
                         self.font_scale as f32,
                         self.font_scale as f32,
                     ));
+                    self.shader.set_uniform_vec2(
+                        "sprite_position",
+                        Vec2::new(
+                            sprite.texture_rect().left as f32,
+                            sprite.texture_rect().top as f32,
+                        ),
+                    );
                     let mut states_fg_bg = RenderStates::default();
                     states_fg_bg.set_shader(Some(&self.shader));
                     self.texture.draw_with_renderstates(&sprite, &states_fg_bg);
@@ -502,6 +516,15 @@ impl<'a> Text<'a> {
             .set_uniform_vec4("fg_color", Vec4::from(self.bg_color));
         self.shader
             .set_uniform_float("bold_offset", if self.bold { 1.0 } else { 0.0 });
+        let font_texture_size = font.texture.size();
+        self.shader.set_uniform_vec2(
+            "atlas_size",
+            Vec2::new(font_texture_size.x as f32, font_texture_size.y as f32),
+        );
+        self.shader.set_uniform_vec2(
+            "sprite_size",
+            Vec2::new(font.char_size.x as f32, font.char_size.y as f32),
+        );
 
         let mut states_bg_fg = RenderStates::default();
         states_bg_fg.set_shader(Some(&self.shader));
