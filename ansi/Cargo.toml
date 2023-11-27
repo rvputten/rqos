@@ -1,6 +1,6 @@
 [package]
-name = "rqsh"
-description = "Terminal and shell using rqos"
+name = "ansi"
+description = "Handle ANSI codes and escape sequences"
 edition.workspace = true
 version.workspace = true
 authors.workspace = true
@@ -10,8 +10,3 @@ repository.workspace = true
 [dependencies]
 sfml.workspace = true
 color.workspace = true
-config.workspace = true
-text.workspace = true
-edit.workspace = true
-font.workspace = true
-ansi.workspace = true

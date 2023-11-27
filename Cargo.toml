@@ -2,6 +2,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "ansi",
     "color",
     "config",
     "edit",
@@ -21,6 +22,7 @@ repository = "https://github.com/rvputten/rqos.git"
 
 [workspace.dependencies]
 sfml = "0.21"
+ansi = { path = "ansi" }
 color = { path = "color" }
 config = { path = "config" }
 edit = { path = "edit" }

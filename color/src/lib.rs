@@ -11,6 +11,16 @@
 | 35   | Purple | 0x800080 |
 | 36   | Cyan   | 0x00FFFF |
 | 37   | White  | 0xFFFFFF |
+| ---- | ------ | -------- |
+
+# Background Colors
+
+| ANSI | Color  | Hex Code |
+| ---- | ------ | -------- |
+| 40   | Black  | 0x000000 |
+| ...  | ...    | ...      |
+| 47   | White  | 0xFFFFFF |
+| ---- | ------ | -------- |
 
 # High Intensity
 
@@ -24,6 +34,37 @@
 | 95   | Purple | 0x9932CC |
 | 96   | Cyan   | 0x00CED1 |
 | 97   | White  | 0xF8F8FF |
+| ---- | ------ | -------- |
+
+# Background High Intensity
+
+| ANSI | Color  | Hex Code |
+| ---- | ------ | -------- |
+| 100  | Black  | 0x696969 |
+| ...  | ...    | ...      |
+| 107  | White  | 0xF8F8FF |
+| ---- | ------ | -------- |
+
+# Other Common ANSI Codes:
+
+| ANSI | Code                   |
+| ---- | ---------------------- |
+| 0m   | Reset                  |
+| 1m   | Bold                   |
+| 4m   | Underline              |
+| 7m   | Inverse                |
+| H    | Home                   |
+| J    | Clear to End of Screen |
+| 2J   | Clear Screen           |
+| K    | Clear to End of Line   |
+| 2K   | Clear Line             |
+| S    | Scroll Up              |
+| T    | Scroll Down            |
+| A    | Move Cursor Up         |
+| B    | Move Cursor Down       |
+| C    | Move Cursor Forward    |
+| D    | Move Cursor Backward   |
+| ---- | ---------------------- |
 
 */
 

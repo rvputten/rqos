@@ -2,11 +2,20 @@
 
 set -o pipefail
 
+call_args=( "$@" )
 dirname=$(cd "$(dirname "$0")"; pwd -P)
 exe_name=`basename $dirname`
-
+debug=0
+if [[ "$1" == "debug" ]]; then
+    debug=1
+    shift
+fi
 # doesn't work for workspaces; workaround:
 exe_name=${1:-"rqsh"}
+
+# ---------
+# FUNCTIONS
+# ---------
 
 scan_error_code_first_40_lines() {
   awk '/^error/{c++; if (c==2) {exit}} {print}' | head -40
@@ -36,24 +45,23 @@ function wait_and_run() {
     inotifywait -q -e close_write */src Cargo.toml */Cargo.toml resources/*.frag scripts/*.sh
     clear
 
-    exec ./run.sh "$exe_name"
+    exec ./run.sh ${call_args[@]}
 }
 
-#pid=`cat .pid 2>/dev/null`
-#[[ -n $pid ]] && { echo "Killing $pid"; kill $pid; }
+# -----
+# CARGO
+# -----
 
+# CARGO FMT
 cargo fmt
 
+# CARGO BUILD
 (cargo build -p $exe_name --color=always 2>&1 | scan_error_code_first_40_lines | tee error.txt)
 r=$?
 error_to_clipboard build
 [[ "$r" -ne 0 ]] && wait_and_run
 
-cargo run -p $exe_name --color=always
-r=$?
-echo $! > .pid
-[[ "$r" -ne 0 ]] && wait_and_run
-
+# CARGO CLIPPY
 cargo clippy --color=always -- -D warnings 2>&1 | scan_error_code_first_40_lines | tee error.txt
 r=$?
 error_to_clipboard clippy
@@ -64,12 +72,28 @@ r=$?
 error_to_clipboard clippy_tests
 [[ "$r" -ne 0 ]] && wait_and_run
 
+# DEBUG
+if [[ "$debug" -eq 1 ]]; then
+    cargo build -p $exe_name --color=always
+    r=$?
+    [[ "$r" -eq 0 ]] && {
+        cgdb target/debug/$exe_name 
+        wait_and_run
+    }
+fi
 
+# CARGO TEST
 [[ -f .env ]] && source .env
 cargo test --workspace --color=always -- --nocapture 2>&1 | tee error.txt
 r=$?
 [[ "$r" -ne 0 ]] && wait_and_run
 error_to_clipboard tests
+
+# CARGO RUN
+cargo run -p $exe_name --color=always
+r=$?
+echo $! > .pid
+[[ "$r" -ne 0 ]] && wait_and_run
 
 
 rg --color=always '#\[allow\((dead_code|unused_variables)\)\]'

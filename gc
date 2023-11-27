@@ -1,9 +1,0 @@
-#!/bin/bash
-#!/bin/bash
-# vim:ft=sh
-git status | grep -q "Untracked" || {
-    git -c color.status=always pull &&
-	git -c color.status=always commit -a -m "$*" &&
-	git -c color.status=always push
-}
-git -c color.status=always status
