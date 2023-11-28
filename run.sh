@@ -77,7 +77,7 @@ if [[ "$debug" -eq 1 ]]; then
     cargo build -p $exe_name --color=always
     r=$?
     [[ "$r" -eq 0 ]] && {
-        cgdb target/debug/$exe_name 
+        rust-gdb target/debug/$exe_name
         wait_and_run
     }
 fi

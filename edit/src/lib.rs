@@ -53,6 +53,7 @@ impl EditBuilder {
         } else {
             edit.set_cursor_state(text::CursorState::InsertActive);
         }
+        edit.text.insert_mode = text::InsertMode::Insert;
         edit
     }
 }

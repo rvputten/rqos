@@ -3,16 +3,20 @@ use sfml::graphics::Color;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum AnsiCode {
-    Char(char),
     ClearFromCursorDown,
     ClearFromCursorUp,
     ClearEntireScreen,
     ClearFromCursorToEndOfLine,
     ClearFromCursorToStartOfLine,
     ClearEntireLine,
-    MoveCursorRelative(i32, i32),
-    MoveCursorAbsoluteX(i32),
-    MoveCursorAbsoluteY(i32),
+    CursorUp(i32),
+    CursorDown(i32),
+    CursorForward(i32),
+    CursorBackward(i32),
+    CursorNextLine(i32),
+    CursorPreviousLine(i32),
+    CursorToColumn(i32),
+    CursorTo(i32, i32),
     ScrollScreen(i32),
     ColorForeground(Color),
     ColorBackground(Color),
@@ -68,6 +72,12 @@ impl Ansi {
     /// | nT   | scroll down                                     |
     /// | ---- | ----------------------------------------------- |
     pub fn parse(text: &str) -> AnsiWrap {
+        if text.is_empty() || !text.starts_with('\x1b') {
+            return AnsiWrap {
+                codes: Vec::new(),
+                char_count: 0,
+            };
+        }
         let mut codes = Vec::new();
         let mut char_count = 0;
         let chars = text.chars();
@@ -97,7 +107,6 @@ impl Ansi {
                     continue;
                 } else {
                     state = State::Normal;
-                    codes.push(AnsiCode::Char(c));
                     eprintln!("ansi: unknown escape sequence: {}", c);
                     continue;
                 }
@@ -120,14 +129,17 @@ impl Ansi {
                 let number1 = numbers.first().cloned();
                 let number2 = numbers.get(1).cloned();
                 match c {
-                    'A' => codes.push(AnsiCode::MoveCursorRelative(0, -number1.unwrap_or(1))),
-                    'B' => codes.push(AnsiCode::MoveCursorRelative(0, number1.unwrap_or(1))),
-                    'C' => codes.push(AnsiCode::MoveCursorRelative(number1.unwrap_or(1), 0)),
-                    'D' => codes.push(AnsiCode::MoveCursorRelative(-number1.unwrap_or(1), 0)),
-                    'E' => codes.push(AnsiCode::MoveCursorRelative(0, number1.unwrap_or(1))),
-                    'F' => codes.push(AnsiCode::MoveCursorRelative(0, -number1.unwrap_or(1))),
-                    'G' => codes.push(AnsiCode::MoveCursorAbsoluteX(number1.unwrap_or(1))),
-                    'H' => codes.push(AnsiCode::MoveCursorAbsoluteY(number1.unwrap_or(1))),
+                    'A' => codes.push(AnsiCode::CursorUp(number1.unwrap_or(1))),
+                    'B' => codes.push(AnsiCode::CursorDown(number1.unwrap_or(1))),
+                    'C' => codes.push(AnsiCode::CursorForward(number1.unwrap_or(1))),
+                    'D' => codes.push(AnsiCode::CursorBackward(number1.unwrap_or(1))),
+                    'E' => codes.push(AnsiCode::CursorNextLine(number1.unwrap_or(1))),
+                    'F' => codes.push(AnsiCode::CursorPreviousLine(number1.unwrap_or(1))),
+                    'G' => codes.push(AnsiCode::CursorToColumn(number1.unwrap_or(1))),
+                    'H' => codes.push(AnsiCode::CursorTo(
+                        number1.unwrap_or(1),
+                        number2.unwrap_or(1),
+                    )),
                     'J' => {
                         if number1 == Some(0) || number1.is_none() {
                             codes.push(AnsiCode::ClearFromCursorToEndOfLine);

@@ -5,6 +5,7 @@ use sfml::graphics::{
 };
 use sfml::system::{Vector2f, Vector2i};
 
+use ansi::{Ansi, AnsiCode};
 use color::ColorType;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -22,6 +23,12 @@ pub enum VerticalAlignment {
     BottomOnOverflow,
 }
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum InsertMode {
+    Overwrite,
+    Insert,
+}
+
 pub struct TextBuilder {
     position: Option<Vector2i>,
     size: Option<Vector2i>,
@@ -33,6 +40,7 @@ pub struct TextBuilder {
     cursor_normal_color: Option<Color>,
     bold: Option<bool>,
     cursor_state: Option<CursorState>,
+    insert_mode: Option<InsertMode>,
 }
 
 impl TextBuilder {
@@ -48,7 +56,13 @@ impl TextBuilder {
             cursor_normal_color: None,
             bold: None,
             cursor_state: None,
+            insert_mode: None,
         }
+    }
+
+    pub fn insert_mode(mut self, insert_mode: InsertMode) -> Self {
+        self.insert_mode = Some(insert_mode);
+        self
     }
 
     pub fn position(mut self, position: Vector2i) -> Self {
@@ -122,6 +136,7 @@ impl TextBuilder {
         .unwrap();
 
         let ansi_colors = color::AnsiColor::new();
+        let insert_mode = self.insert_mode.unwrap_or(InsertMode::Overwrite);
 
         Text {
             text: vec![String::new()],
@@ -140,6 +155,7 @@ impl TextBuilder {
             cursor_state,
             cursor_position: Vector2i::new(0, 0),
             scroll_pos_y: 0,
+            insert_mode,
         }
     }
 }
@@ -167,6 +183,7 @@ pub struct Text<'a> {
     pub cursor_state: CursorState,
     pub cursor_position: Vector2i,
     pub scroll_pos_y: i32,
+    pub insert_mode: InsertMode,
 }
 
 impl Default for Text<'_> {
@@ -243,50 +260,139 @@ impl<'a> Text<'a> {
         Vector2i::new(self.texture.size().x as i32, self.texture.size().y as i32)
     }
 
-    pub fn write(&mut self, text: &str) {
-        let line = if self.text.is_empty() {
-            ""
-        } else {
-            &self.text[self.cursor_position.y as usize]
+    /// write text to the internal buffer
+    /// existing text is overwritten depending on the cursor position
+    /// ansi escape codes are interpreted if they manipulate the buffer or the cursor
+    /// ansi escape codes for color and style are stored in the buffer
+    pub fn write(&mut self, input: &str) {
+        if self.text.is_empty() {
+            self.text.push(String::new());
         };
 
-        let old_cursor_y = self.cursor_position.y;
+        let mut line: Vec<char>;
 
-        let line_left = &line[..self.cursor_position.x as usize];
-        let line_right = &line[self.cursor_position.x as usize..];
-        let mut line: Vec<char> = line_left.chars().collect();
-        let mut lines_to_insert: Vec<String> = Vec::new();
-
-        for c in text.chars() {
-            if c == '\r' {
-                self.cursor_position.x = 0;
-            } else if c == '\n' {
-                lines_to_insert.push(line.into_iter().collect::<String>());
-                line = vec![];
-                self.cursor_position.x = 0;
-                self.cursor_position.y += 1;
-            } else {
-                if line.len() > self.cursor_position.x as usize {
-                    line[self.cursor_position.x as usize] = c;
-                } else {
-                    line.push(c);
+        macro_rules! text2line {
+            () => {
+                while self.text.len() <= self.cursor_position.y as usize {
+                    self.text.push(String::new());
                 }
+                line = self.text[self.cursor_position.y as usize]
+                    .chars()
+                    .collect::<Vec<_>>()
+            };
+        }
+
+        macro_rules! line2text {
+            () => {
+                self.text[self.cursor_position.y as usize] = line.into_iter().collect::<String>()
+            };
+        }
+
+        macro_rules! line_set {
+            ($c:expr) => {
+                if self.insert_mode == InsertMode::Overwrite {
+                    while line.len() <= self.cursor_position.x as usize {
+                        line.push(' ');
+                    }
+                    line[self.cursor_position.x as usize] = $c;
+                } else {
+                    while line.len() < self.cursor_position.x as usize {
+                        line.push(' ');
+                    }
+                    line.insert(self.cursor_position.x as usize, $c);
+                }
+            };
+        }
+
+        macro_rules! line_push_string {
+            ($s:expr) => {
+                for c in $s.chars() {
+                    line_set!(c);
+                    self.cursor_position.x += 1;
+                }
+            };
+        }
+
+        text2line!();
+
+        let mut idx = 0;
+        let chars = input.chars().collect::<Vec<_>>();
+        while idx < chars.len() {
+            let c = chars[idx];
+            // test for Ansi sequence
+            if c == '\x1b' {
+                let codes = Ansi::parse(&input[idx..]);
+                idx += codes.char_count;
+                for code in codes.codes {
+                    match code {
+                        AnsiCode::CursorUp(n) => {
+                            line2text!();
+                            self.cursor_position.y -= n;
+                            if self.cursor_position.y < 0 {
+                                self.cursor_position.y = 0;
+                            }
+                            text2line!();
+                        }
+                        AnsiCode::CursorDown(n) => {
+                            line2text!();
+                            self.cursor_position.y += n;
+                            if self.cursor_position.y >= self.text.len() as i32 {
+                                self.cursor_position.y = self.text.len() as i32 - 1;
+                            }
+                            text2line!();
+                        }
+                        AnsiCode::ColorForeground(color) => {
+                            let (r, g, b) = (color.r, color.g, color.b);
+                            line_push_string!(format!("\x1b[38;2;{};{};{}m", r, g, b));
+                        }
+                        AnsiCode::ColorBackground(color) => {
+                            let (r, g, b) = (color.r, color.g, color.b);
+                            line_push_string!(format!("\x1b[48;2;{};{};{}m", r, g, b));
+                        }
+                        AnsiCode::Bold => {
+                            line_push_string!("\x1b[1m");
+                        }
+                        AnsiCode::ResetAll => {
+                            line_push_string!("\x1b[0m");
+                        }
+                        _ => {
+                            eprintln!("Unrecognized ANSI escape code: {:?}", code);
+                        }
+                    }
+                }
+            } else if c == '\r' {
+                self.cursor_position.x = 0;
+                idx += 1;
+            } else if c == '\n' {
+                if self.insert_mode == InsertMode::Overwrite {
+                    line2text!();
+                    self.cursor_position.x = 0;
+                    self.cursor_position.y += 1;
+                    text2line!();
+                } else {
+                    let line_right: Vec<char> = line[self.cursor_position.x as usize..].to_vec();
+                    line = line[..self.cursor_position.x as usize].to_vec();
+                    line2text!();
+                    line = line_right;
+                    if self.cursor_position.y == self.text.len() as i32 - 1 {
+                        self.text.push(String::new());
+                    } else {
+                        self.text
+                            .insert(self.cursor_position.y as usize + 1, String::new());
+                    }
+                    self.cursor_position.x = 0;
+                    self.cursor_position.y += 1;
+                }
+                idx += 1;
+            } else {
+                line_set!(c);
                 self.cursor_position.x += 1;
+                idx += 1;
             }
         }
-        let mut line = line.into_iter().collect::<String>();
-        line.push_str(line_right);
-        lines_to_insert.push(line);
 
-        if self.text.is_empty() {
-            self.text = lines_to_insert;
-        } else {
-            self.text.remove(old_cursor_y as usize);
-            self.text.splice(
-                old_cursor_y as usize..old_cursor_y as usize,
-                lines_to_insert,
-            );
-        }
+        line2text!();
+
         self.redraw = true;
     }
 
@@ -595,25 +701,25 @@ mod tests {
     }
 
     #[test]
-    fn test_write_cursor1() {
-        let mut text = Text::default();
+    fn test_insert1() {
+        let mut text = TextBuilder::new().insert_mode(InsertMode::Insert).build();
         text.write("World");
         text.move_cursor_horz(-2);
         text.write("Hello ");
-        assert_eq!(text.text, vec!["Hello World"]);
+        assert_eq!(text.text, vec!["Hello World"]); // extra space at end OK
         assert_eq!(text.cursor_position, Vector2i::new(6, 0));
     }
 
     #[test]
-    fn test_write_cursor2() {
+    fn test_insert2() {
         let mut text = Text::default();
         text.write("Hello\nWorld\n");
         assert_eq!(text.text, vec!["Hello", "World", ""]);
     }
 
     #[test]
-    fn test_write_cursor3() {
-        let mut text = Text::default();
+    fn test_insert3() {
+        let mut text = TextBuilder::new().insert_mode(InsertMode::Insert).build();
         text.write("Line 1\nLine 2\nLine 3");
         text.cursor_position = Vector2i::new(0, 1);
         text.write("Line 2.5\n");
@@ -622,15 +728,57 @@ mod tests {
     }
 
     #[test]
-    fn test_write_cursor4() {
+    fn test_insert4() {
+        let mut text = TextBuilder::new().insert_mode(InsertMode::Insert).build();
+        text.write("Line 1\nLin2\nLine 3\n");
+        text.cursor_position = Vector2i::new(3, 1);
+        text.write("e ");
+        text.cursor_position = Vector2i::new(0, 3);
+        text.write("Line 4\n");
+        assert_eq!(text.text, vec!["Line 1", "Line 2", "Line 3", "Line 4", ""],);
+        assert_eq!(text.cursor_position, Vector2i::new(0, 4));
+    }
+
+    #[test]
+    fn test_overwrite() {
+        let mut text = TextBuilder::new()
+            .insert_mode(InsertMode::Overwrite)
+            .build();
+        text.write("LINE 1\nLine\nLine x");
+        text.cursor_position = Vector2i::new(1, 0);
+        text.write("ine");
+        text.cursor_position = Vector2i::new(5, 1);
+        text.write("2\nLine 3\nLine 4\n");
+        assert_eq!(text.text, vec!["Line 1", "Line 2", "Line 3", "Line 4", ""],);
+        assert_eq!(text.cursor_position, Vector2i::new(0, 4));
+    }
+
+    #[test]
+    fn test_cursor_up_down() {
         let mut text = Text::default();
-        text.write("Line 1\nLine 2\nLine 3");
-        text.cursor_position = Vector2i::new(6, 1);
-        text.write(".5\nLine 2.7\nLine 2.9");
+        // echo "Lines 1-4 must be in order without gaps."
+        // echo "Line 1"
+        // echo
+        // echo "Line 3"
+        // printf "\e[2ALine 2\n"
+        // printf "\e[2BLine 4\n"
+        text.write("Lines 1-4 must be in order without gaps.\n");
+        text.write("Line 1\n");
+        text.write("\n");
+        text.write("Line 3\n");
+        text.write("\x1b[2ALine 2\n");
+        text.write("\x1b[2BLine 4\n");
         assert_eq!(
             text.text,
-            vec!["Line 1", "Line 2.5", "Line 2.7", "Line 2.9", "Line 3"]
+            vec![
+                "Lines 1-4 must be in order without gaps.",
+                "Line 1",
+                "Line 2",
+                "Line 3",
+                "Line 4",
+                ""
+            ]
         );
-        assert_eq!(text.cursor_position, Vector2i::new(8, 3));
+        assert_eq!(text.cursor_position, Vector2i::new(0, 5));
     }
 }

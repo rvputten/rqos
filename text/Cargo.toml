@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 sfml.workspace = true
+ansi.workspace = true
 color.workspace = true
 config.workspace = true
 font.workspace = true
