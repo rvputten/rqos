@@ -4,6 +4,7 @@ mod args;
 mod builtin;
 mod execute;
 mod glob;
+mod util;
 
 use app::App;
 

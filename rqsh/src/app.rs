@@ -10,6 +10,7 @@ use crate::args::Args;
 use crate::builtin::Builtin;
 use crate::execute::{BuiltinCommand, ExecMessage, Job};
 use crate::glob::Glob;
+use crate::util;
 
 enum ScrollType {
     CursorUp,
@@ -353,7 +354,10 @@ impl App<'_> {
 
         let len = args.len();
         match len {
-            0 => self.jobs.iter().rev().map(|j| j.args_printable()).collect(),
+            0 => {
+                let job_names = self.jobs.iter().rev().map(|j| j.args_printable()).collect();
+                util::dedup_preserve_order(job_names)
+            }
             1 => {
                 let arg = &args[0];
                 let mut matches = vec![];
@@ -362,7 +366,7 @@ impl App<'_> {
                         matches.push(job.args_printable());
                     }
                 }
-                matches
+                util::dedup_preserve_order(matches)
             }
             _ => {
                 let last_arg = &format!("{}*", args[len - 1]);
