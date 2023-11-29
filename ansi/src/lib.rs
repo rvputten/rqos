@@ -84,6 +84,7 @@ impl Ansi {
         let mut state = State::Normal;
         let mut numbers: Vec<i32> = Vec::new();
         let color_codes = color::AnsiColor::new();
+
         for c in chars {
             let old_state = state;
             if old_state == State::Normal {
@@ -107,7 +108,7 @@ impl Ansi {
                     continue;
                 } else {
                     state = State::Normal;
-                    eprintln!("ansi: unknown escape sequence: {}", c);
+                    eprintln!("ansi: unknown escape sequence 7: {}", c);
                     continue;
                 }
             }
@@ -150,7 +151,7 @@ impl Ansi {
                         } else if number1 == Some(3) {
                             codes.push(AnsiCode::ClearScrollbackBuffer);
                         } else {
-                            eprintln!("ansi: unknown escape sequence: {}J", number1.unwrap());
+                            eprintln!("ansi: unknown escape sequence: 9{}J", number1.unwrap());
                         }
                     }
                     'K' => {
@@ -161,7 +162,7 @@ impl Ansi {
                         } else if number1 == Some(2) {
                             codes.push(AnsiCode::ClearEntireLine);
                         } else {
-                            eprintln!("ansi: unknown escape sequence: {}K", number1.unwrap());
+                            eprintln!("ansi: unknown escape sequence: 10{}K", number1.unwrap());
                         }
                     }
                     'S' => codes.push(AnsiCode::ScrollScreen(number1.unwrap_or(1))),
@@ -169,83 +170,106 @@ impl Ansi {
                     'm' => {
                         if numbers.is_empty() {
                             codes.push(AnsiCode::ResetAll);
-                            continue;
-                        }
-                        loop {
-                            if numbers.is_empty() {
-                                break;
-                            }
-                            let n = numbers.remove(0);
-                            if n == 0 {
-                                codes.push(AnsiCode::ResetAll);
-                            } else {
-                                match n {
-                                    1 => codes.push(AnsiCode::Bold),
-                                    3 => codes.push(AnsiCode::Italic),
-                                    4 => codes.push(AnsiCode::Underline),
-                                    7 => codes.push(AnsiCode::Reverse),
-                                    22 => codes.push(AnsiCode::ResetAll),
-                                    23 => codes.push(AnsiCode::ResetAll),
-                                    24 => codes.push(AnsiCode::ResetAll),
-                                    27 => codes.push(AnsiCode::ResetAll),
-                                    30..=37 => {
-                                        if let Some(n) = color_codes.get_color_from_ansi(n as usize)
-                                        {
-                                            codes.push(AnsiCode::ColorForeground(n));
-                                        } else {
-                                            eprintln!("ansi: unknown escape sequence 1: {}m", n);
-                                        }
-                                    }
-                                    38 => {
-                                        if number2 == Some(5) {
-                                            let n = number1.unwrap();
+                        } else {
+                            loop {
+                                if numbers.is_empty() {
+                                    break;
+                                }
+                                let n = numbers.remove(0);
+                                if n == 0 {
+                                    codes.push(AnsiCode::ResetAll);
+                                } else {
+                                    match n {
+                                        1 => codes.push(AnsiCode::Bold),
+                                        3 => codes.push(AnsiCode::Italic),
+                                        4 => codes.push(AnsiCode::Underline),
+                                        7 => codes.push(AnsiCode::Reverse),
+                                        22 => codes.push(AnsiCode::ResetAll),
+                                        23 => codes.push(AnsiCode::ResetAll),
+                                        24 => codes.push(AnsiCode::ResetAll),
+                                        27 => codes.push(AnsiCode::ResetAll),
+                                        30..=37 => {
                                             if let Some(n) =
                                                 color_codes.get_color_from_ansi(n as usize)
                                             {
                                                 codes.push(AnsiCode::ColorForeground(n));
                                             } else {
                                                 eprintln!(
-                                                    "ansi: unknown escape sequence 2: {}m",
+                                                    "ansi: unknown escape sequence 1: {}m",
                                                     n
                                                 );
                                             }
-                                        } else {
-                                            eprintln!("ansi: unknown escape sequence 3: {}m", n);
                                         }
-                                    }
-                                    39 => codes.push(AnsiCode::ResetColorForeground),
-                                    40..=47 => {
-                                        if let Some(n) = color_codes.get_color_from_ansi(n as usize)
-                                        {
-                                            codes.push(AnsiCode::ColorBackground(n));
-                                        } else {
-                                            eprintln!("ansi: unknown escape sequence 4: {}m", n);
+                                        38 => {
+                                            if number2 == Some(5) {
+                                                let n = number1.unwrap();
+                                                if let Some(n) =
+                                                    color_codes.get_color_from_ansi(n as usize)
+                                                {
+                                                    codes.push(AnsiCode::ColorForeground(n));
+                                                } else {
+                                                    eprintln!(
+                                                        "ansi: unknown escape sequence 2: {}m",
+                                                        n
+                                                    );
+                                                }
+                                            } else {
+                                                eprintln!(
+                                                    "ansi: unknown escape sequence 3: {}m",
+                                                    n
+                                                );
+                                            }
                                         }
-                                    }
-                                    48 => {
-                                        if number2 == Some(5) {
-                                            let n = number1.unwrap();
+                                        39 => codes.push(AnsiCode::ResetColorForeground),
+                                        40..=47 => {
                                             if let Some(n) =
                                                 color_codes.get_color_from_ansi(n as usize)
                                             {
                                                 codes.push(AnsiCode::ColorBackground(n));
                                             } else {
                                                 eprintln!(
-                                                    "ansi: unknown escape sequence 5: {}m",
+                                                    "ansi: unknown escape sequence 4: {}m",
                                                     n
                                                 );
                                             }
-                                        } else {
-                                            eprintln!("ansi: unknown escape sequence 6: {}m", n);
                                         }
+                                        48 => {
+                                            if number2 == Some(5) {
+                                                let n = number1.unwrap();
+                                                if let Some(n) =
+                                                    color_codes.get_color_from_ansi(n as usize)
+                                                {
+                                                    codes.push(AnsiCode::ColorBackground(n));
+                                                } else {
+                                                    eprintln!(
+                                                        "ansi: unknown escape sequence 5: {}m",
+                                                        n
+                                                    );
+                                                }
+                                            } else {
+                                                eprintln!(
+                                                    "ansi: unknown escape sequence 6: {}m",
+                                                    n
+                                                );
+                                            }
+                                        }
+                                        49 => codes.push(AnsiCode::ResetColorBackground),
+                                        _ => eprintln!("ansi: unknown escape sequence: {}m", n),
                                     }
-                                    49 => codes.push(AnsiCode::ResetColorBackground),
-                                    _ => eprintln!("ansi: unknown escape sequence: {}m", n),
                                 }
                             }
                         }
                     }
-                    _ => eprintln!("ansi: unknown escape sequence: {:?}{}", numbers.first(), c),
+                    _ => {
+                        if let Some(n) = number1 {
+                            eprintln!("ansi: unknown escape sequence 8: '{}{}'", n, c);
+                        } else {
+                            eprintln!(
+                                "ansi: unknown escape sequence 8: '{}' (c={}, text='{}')",
+                                c, c as u32, text
+                            );
+                        }
+                    }
                 }
                 state = State::Normal;
             }

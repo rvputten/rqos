@@ -327,18 +327,18 @@ impl<'a> Text<'a> {
                     match code {
                         AnsiCode::CursorUp(n) => {
                             line2text!();
-                            self.cursor_position.y -= n;
-                            if self.cursor_position.y < 0 {
-                                self.cursor_position.y = 0;
-                            }
+                            self.cursor_position.y = (self.cursor_position.y - n).max(0);
                             text2line!();
                         }
                         AnsiCode::CursorDown(n) => {
                             line2text!();
-                            self.cursor_position.y += n;
-                            if self.cursor_position.y >= self.text.len() as i32 {
-                                self.cursor_position.y = self.text.len() as i32 - 1;
-                            }
+                            self.cursor_position.y =
+                                (self.cursor_position.y + n).min(self.text.len() as i32 - 1);
+                            text2line!();
+                        }
+                        AnsiCode::CursorTo(y, x) => {
+                            self.cursor_position.x = (x - 1).max(0);
+                            self.cursor_position.y = (y - 1).max(0);
                             text2line!();
                         }
                         AnsiCode::ColorForeground(color) => {
@@ -780,5 +780,19 @@ mod tests {
             ]
         );
         assert_eq!(text.cursor_position, Vector2i::new(0, 5));
+    }
+
+    #[test]
+    fn test_home() {
+        let mut text = Text::default();
+        text.write("\nLine 2\n");
+        text.write("\x1b[HLine 1\n\x1b[3HLine 3\nLine 4\n");
+        text.write("\x1b[H");
+        assert_eq!(text.cursor_position, Vector2i::new(0, 0));
+        text.write("\x1b[3H");
+        assert_eq!(text.cursor_position, Vector2i::new(0, 2));
+        text.write("\x1b[2;4H");
+        assert_eq!(text.cursor_position, Vector2i::new(3, 1));
+        assert_eq!(text.text, vec!["Line 1", "Line 2", "Line 3", "Line 4", ""],);
     }
 }
